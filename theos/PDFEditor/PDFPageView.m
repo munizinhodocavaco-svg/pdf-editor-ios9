@@ -10,6 +10,8 @@
 	   por cima, entao o custo por quadro nao cresce com a quantidade de tracos. */
 	CGImageRef _compositeImage;
 	CGSize _compositeSize;
+	/* Cursor visual da borracha (circulo que segue o dedo). */
+	UIView *_eraserCursor;
 }
 
 @property (nonatomic, strong) Annotation *currentAnnotation;
@@ -18,6 +20,8 @@
 
 - (void)invalidatePageImage;
 - (void)invalidateCompositeImage;
+- (void)updateEraserCursorAtPoint:(CGPoint)point;
+- (void)hideEraserCursor;
 
 @end
 
@@ -87,6 +91,17 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		self.tool = EditorToolPencil;
 		self.multipleTouchEnabled = NO;
 		self.annotations = @[];
+
+		/* Cursor da borracha: circulo tracejado que segue o dedo. */
+		_eraserCursor = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 28, 28)];
+		_eraserCursor.hidden = YES;
+		_eraserCursor.userInteractionEnabled = NO;
+		_eraserCursor.backgroundColor = [UIColor clearColor];
+		_eraserCursor.layer.borderColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:0.9].CGColor;
+		_eraserCursor.layer.borderWidth = 2.0;
+		_eraserCursor.layer.cornerRadius = 14.0;
+		_eraserCursor.layer.borderDashPattern = @[@4, @3];
+		[self addSubview:_eraserCursor];
 	}
 	return self;
 }
@@ -257,6 +272,30 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	return width / 2.0 + 8.0;
 }
 
+#pragma mark - Cursor da Borracha
+
+- (void)updateEraserCursorAtPoint:(CGPoint)point {
+	if (self.tool != EditorToolEraser) {
+		[self hideEraserCursor];
+		return;
+	}
+	CGRect display = [self pageDisplayRect];
+	// So mostra se estiver sobre a pagina
+	if (!CGRectContainsPoint(display, point)) {
+		[self hideEraserCursor];
+		return;
+	}
+	CGFloat radius = self.eraserWidth / 2.0 + 6.0; // raio visual um pouco maior que a area de apagamento
+	_eraserCursor.frame = CGRectMake(point.x - radius, point.y - radius, radius * 2.0, radius * 2.0);
+	_eraserCursor.hidden = NO;
+	// Atualiza cor da borda para combinar com a cor do lapis atual (feedback visual)
+	_eraserCursor.layer.borderColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:0.9].CGColor;
+}
+
+- (void)hideEraserCursor {
+	_eraserCursor.hidden = YES;
+}
+
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	UITouch *touch = [touches anyObject];
 	CGPoint point = [touch locationInView:self];
@@ -268,6 +307,7 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 
 	if (self.tool == EditorToolEraser) {
 		[self eraseAtPoint:point];
+		[self updateEraserCursorAtPoint:point];
 		return;
 	}
 
@@ -392,8 +432,9 @@ static CGFloat DistanceToSegment(CGPoint point, CGPoint start, CGPoint end) {
 	CGPoint previous = CGPointZero;
 	for (NSUInteger i = 0; i < annotation.points.count; i++) {
 		CGPoint normalized = [[annotation.points objectAtIndex:i] CGPointValue];
+		// INVERTE Y para coincidir com o desenho das anotacoes
 		CGPoint current = CGPointMake(display.origin.x + normalized.x * display.size.width,
-									  display.origin.y + normalized.y * display.size.height);
+									  display.origin.y + (1.0 - normalized.y) * display.size.height);
 		if (i > 0 && DistanceToSegment(point, previous, current) <= tolerance) {
 			return YES;
 		}
