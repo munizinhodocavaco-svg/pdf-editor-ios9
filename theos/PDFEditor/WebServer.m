@@ -439,7 +439,8 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 			continue;
 		}
 		NSString *value = [NSString stringWithUTF8String:text];
-		if (strncmp(cursor->ifa_name, "en", 2) == 0) {
+		BOOL isWifiInterface = (cursor->ifa_name[0] == 'e' && cursor->ifa_name[1] == 'n');
+		if (isWifiInterface) {
 			wifi = value;
 		} else if (fallback == nil) {
 			fallback = value;
