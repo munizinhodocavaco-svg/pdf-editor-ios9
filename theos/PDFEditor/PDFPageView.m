@@ -1,4 +1,5 @@
 #import "PDFPageView.h"
+#import <math.h>
 
 @interface PDFPageView ()
 @property (nonatomic, strong) Annotation *currentAnnotation;

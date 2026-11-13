@@ -6,9 +6,16 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = PDFEditor
 
-PDFEditor_FILES = main.m AppDelegate.m DocumentListViewController.m RootViewController.m PDFPageView.m Annotation.m AnnotationStore.m
+PDFEditor_FILES = PDFEditor/main.m \
+	PDFEditor/AppDelegate.m \
+	PDFEditor/DocumentListViewController.m \
+	PDFEditor/RootViewController.m \
+	PDFEditor/PDFPageView.m \
+	PDFEditor/Annotation.m \
+	PDFEditor/AnnotationStore.m
 PDFEditor_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
 PDFEditor_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
 PDFEditor_LDFLAGS = -Wl,-segalign,4000
+PDFEditor_INSTALL_PATH = /Applications
 
 include $(THEOS)/makefiles/application.mk
