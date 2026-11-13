@@ -1,9 +1,17 @@
 #import "PDFPageView.h"
 #import <math.h>
 
-@interface PDFPageView ()
+@interface PDFPageView () {
+	/* Pagina PDF renderizada uma unica vez por tamanho de tela. Sem isso o
+	   CGContextDrawPDFPage rodava a cada toque, o que travava o iPad 2. */
+	CGImageRef _pageImage;
+	CGSize _pageImageSize;
+}
+
 @property (nonatomic, strong) Annotation *currentAnnotation;
 @property (nonatomic, assign) CGPoint lastPoint;
+@property (nonatomic, strong) NSArray *sortedAnnotations;
+
 @end
 
 @implementation PDFPageView
@@ -17,6 +25,10 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 }
 
 - (void)dealloc {
+	if (_pageImage != NULL) {
+		CGImageRelease(_pageImage);
+		_pageImage = NULL;
+	}
 	if (_page != NULL) {
 		CGPDFPageRelease(_page);
 		_page = NULL;
@@ -34,6 +46,20 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	if (page != NULL) {
 		_page = CGPDFPageRetain(page);
 	}
+	[self invalidatePageImage];
+}
+
+- (void)setAnnotations:(NSArray *)annotations {
+	_annotations = [annotations copy];
+	/* Ordena uma vez (marcador atras do lapis) em vez de ordenar a cada quadro. */
+	self.sortedAnnotations = [_annotations sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2) {
+		Annotation *a = (Annotation *)obj1;
+		Annotation *b = (Annotation *)obj2;
+		if (a.type == b.type) {
+			return NSOrderedSame;
+		}
+		return (a.type < b.type) ? NSOrderedAscending : NSOrderedDescending;
+	}];
 	[self setNeedsDisplay];
 }
 
@@ -41,13 +67,31 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	self = [super initWithFrame:frame];
 	if (self) {
 		self.backgroundColor = [UIColor whiteColor];
+		self.opaque = YES;
+		self.clearsContextBeforeDrawing = NO;
 		self.strokeColor = [UIColor blackColor];
 		self.strokeWidth = 3.0;
 		self.tool = EditorToolPencil;
-		self.annotations = @[];
 		self.multipleTouchEnabled = NO;
+		self.sortedAnnotations = @[];
 	}
 	return self;
+}
+
+- (void)layoutSubviews {
+	[super layoutSubviews];
+	if (_pageImage != NULL && !CGSizeEqualToSize(_pageImageSize, self.bounds.size)) {
+		[self invalidatePageImage];
+	}
+}
+
+- (void)invalidatePageImage {
+	if (_pageImage != NULL) {
+		CGImageRelease(_pageImage);
+		_pageImage = NULL;
+	}
+	_pageImageSize = CGSizeZero;
+	[self setNeedsDisplay];
 }
 
 /* Retangulo, em coordenadas da view, onde a pagina PDF e desenhada. */
@@ -67,45 +111,69 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 					  size.width, size.height);
 }
 
+#pragma mark - Cache da pagina
+
+/* Renderiza a pagina para um CGImage (fundo branco + PDF + borda) e reaproveita
+   nos quadros seguintes. Tambem evita o custo de desenhar o PDF durante o traco. */
+- (CGImageRef)cachedPageImage {
+	CGSize size = self.bounds.size;
+	if (size.width < 1.0 || size.height < 1.0) {
+		return NULL;
+	}
+	if (_pageImage != NULL && CGSizeEqualToSize(_pageImageSize, size)) {
+		return _pageImage;
+	}
+	if (_pageImage != NULL) {
+		CGImageRelease(_pageImage);
+		_pageImage = NULL;
+	}
+
+	UIGraphicsBeginImageContextWithOptions(size, YES, 1.0);
+	CGContextRef context = UIGraphicsGetCurrentContext();
+	CGContextSetFillColorWithColor(context, [UIColor whiteColor].CGColor);
+	CGContextFillRect(context, CGRectMake(0.0, 0.0, size.width, size.height));
+
+	CGRect display = [self pageDisplayRect];
+	if (self.page != NULL) {
+		CGRect pageRect = PageBoxRect(self.page);
+		CGContextSaveGState(context);
+		CGContextTranslateCTM(context, display.origin.x, display.origin.y + display.size.height);
+		CGContextScaleCTM(context, 1.0, -1.0);
+		CGFloat scale = display.size.width / pageRect.size.width;
+		CGContextScaleCTM(context, scale, scale);
+		CGContextTranslateCTM(context, -pageRect.origin.x, -pageRect.origin.y);
+		CGContextDrawPDFPage(context, self.page);
+		CGContextRestoreGState(context);
+	}
+
+	CGContextSetStrokeColorWithColor(context, [UIColor colorWithWhite:0.75 alpha:1.0].CGColor);
+	CGContextSetLineWidth(context, 1.0);
+	CGContextStrokeRect(context, CGRectInset(display, 0.5, 0.5));
+
+	UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+	if (image.CGImage != NULL) {
+		_pageImage = CGImageRetain(image.CGImage);
+		_pageImageSize = size;
+	}
+	UIGraphicsEndImageContext();
+	return _pageImage;
+}
+
 - (void)drawRect:(CGRect)rect {
 	CGContextRef context = UIGraphicsGetCurrentContext();
 
-	[[UIColor whiteColor] setFill];
-	CGContextFillRect(context, self.bounds);
-
-	if (self.page == NULL) {
-		return;
+	CGImageRef image = [self cachedPageImage];
+	if (image != NULL) {
+		CGContextSetInterpolationQuality(context, kCGInterpolationNone);
+		CGContextDrawImage(context, self.bounds, image);
+	} else {
+		CGContextSetFillColorWithColor(context, [UIColor whiteColor].CGColor);
+		CGContextFillRect(context, rect);
 	}
 
 	CGRect display = [self pageDisplayRect];
-	CGRect pageRect = PageBoxRect(self.page);
-
-	/* Desenha a pagina PDF (sistema de coordenadas do PDF tem origem embaixo). */
-	CGContextSaveGState(context);
-	CGContextTranslateCTM(context, display.origin.x, display.origin.y + display.size.height);
-	CGContextScaleCTM(context, 1.0, -1.0);
-	CGFloat scale = display.size.width / pageRect.size.width;
-	CGContextScaleCTM(context, scale, scale);
-	CGContextTranslateCTM(context, -pageRect.origin.x, -pageRect.origin.y);
-	CGContextDrawPDFPage(context, self.page);
-	CGContextRestoreGState(context);
-
-	/* Borda da pagina */
-	CGContextSetStrokeColorWithColor(context, [UIColor colorWithWhite:0.75 alpha:1.0].CGColor);
-	CGContextSetLineWidth(context, 1.0);
-	CGContextStrokeRect(context, display);
-
 	/* Marcador primeiro (fica por baixo do lapis). */
-	NSArray *sorted = [self.annotations sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2) {
-		Annotation *a = (Annotation *)obj1;
-		Annotation *b = (Annotation *)obj2;
-		if (a.type == b.type) {
-			return NSOrderedSame;
-		}
-		return (a.type < b.type) ? NSOrderedAscending : NSOrderedDescending;
-	}];
-
-	for (Annotation *annotation in sorted) {
+	for (Annotation *annotation in self.sortedAnnotations) {
 		DrawAnnotationInContext(context, annotation, display);
 	}
 
@@ -114,12 +182,20 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	}
 }
 
+#pragma mark - Toques
+
 - (CGPoint)normalizedPoint:(CGPoint)point inRect:(CGRect)rect {
 	if (rect.size.width < 1.0 || rect.size.height < 1.0) {
 		return CGPointZero;
 	}
 	return CGPointMake((point.x - rect.origin.x) / rect.size.width,
 					   (point.y - rect.origin.y) / rect.size.height);
+}
+
+/* Margem extra em volta do segmento recem-desenhado; so essa area e repintada. */
+- (CGFloat)dirtyPadding {
+	CGFloat width = (self.tool == EditorToolHighlighter) ? MAX(self.strokeWidth * 4.0, 14.0) : self.strokeWidth;
+	return width / 2.0 + 8.0;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -153,15 +229,16 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	self.lastPoint = point;
 	[annotation addPoint:[self normalizedPoint:point inRect:display]];
 	self.currentAnnotation = annotation;
-	[self setNeedsDisplay];
+
+	CGFloat padding = [self dirtyPadding];
+	[self setNeedsDisplayInRect:CGRectInset(CGRectMake(point.x, point.y, 0.5, 0.5), -padding, -padding)];
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
 	UITouch *touch = [touches anyObject];
-	CGPoint point = [touch locationInView:self];
 
 	if (self.tool == EditorToolEraser) {
-		[self eraseAtPoint:point];
+		[self eraseAtPoint:[touch locationInView:self]];
 		return;
 	}
 
@@ -169,16 +246,38 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		return;
 	}
 
-	CGFloat dx = point.x - self.lastPoint.x;
-	CGFloat dy = point.y - self.lastPoint.y;
-	if (sqrt(dx * dx + dy * dy) < 2.0) {
-		return;
+	CGRect display = [self pageDisplayRect];
+	CGFloat padding = [self dirtyPadding];
+
+	/* coalescedTouchesForTouch entrega todos os pontos que o sistema capturou
+	   entre dois quadros: traco mais suave sem custo extra de renderizacao. */
+	NSArray *samples = [event coalescedTouchesForTouch:touch];
+	if (samples.count == 0) {
+		samples = @[touch];
 	}
 
-	self.lastPoint = point;
-	CGRect display = [self pageDisplayRect];
-	[self.currentAnnotation addPoint:[self normalizedPoint:point inRect:display]];
-	[self setNeedsDisplay];
+	CGRect dirty = CGRectNull;
+	for (UITouch *sample in samples) {
+		CGPoint point = [sample locationInView:self];
+		CGFloat dx = point.x - self.lastPoint.x;
+		CGFloat dy = point.y - self.lastPoint.y;
+		if (sqrt(dx * dx + dy * dy) < 1.5) {
+			continue;
+		}
+
+		CGRect segment = CGRectMake(MIN(self.lastPoint.x, point.x) - padding,
+									MIN(self.lastPoint.y, point.y) - padding,
+									fabs(dx) + padding * 2.0,
+									fabs(dy) + padding * 2.0);
+		dirty = CGRectIsNull(dirty) ? segment : CGRectUnion(dirty, segment);
+
+		self.lastPoint = point;
+		[self.currentAnnotation addPoint:[self normalizedPoint:point inRect:display]];
+	}
+
+	if (!CGRectIsNull(dirty)) {
+		[self setNeedsDisplayInRect:dirty];
+	}
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -263,7 +362,6 @@ static CGFloat DistanceToSegment(CGPoint point, CGPoint start, CGPoint end) {
 	for (Annotation *annotation in removed) {
 		[self.delegate pageView:self didRemoveAnnotation:annotation];
 	}
-	[self setNeedsDisplay];
 }
 
 @end

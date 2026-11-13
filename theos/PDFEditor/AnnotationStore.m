@@ -55,22 +55,39 @@
 	[self save];
 }
 
+/* Gravacao em segundo plano: evita travar a tela quando o arquivo de anotacoes
+   fica grande. O retrato e tirado na thread principal (rapido) e o JSON e
+   montado/escrito numa fila serial. */
 - (void)save {
-	NSMutableDictionary *serialized = [NSMutableDictionary dictionary];
+	NSMutableDictionary *snapshot = [NSMutableDictionary dictionary];
 	for (NSNumber *key in self.pages) {
 		NSArray *annotations = [self.pages objectForKey:key];
-		NSMutableArray *list = [NSMutableArray array];
-		for (Annotation *annotation in annotations) {
-			[list addObject:[annotation dictionaryRepresentation]];
-		}
-		[serialized setObject:list forKey:[key stringValue]];
+		[snapshot setObject:[annotations copy] forKey:key];
 	}
+	NSString *path = [self annotationsPath];
 
-	NSError *error = nil;
-	NSData *data = [NSJSONSerialization dataWithJSONObject:serialized options:0 error:&error];
-	if (data != nil) {
-		[data writeToFile:[self annotationsPath] atomically:YES];
-	}
+	static dispatch_queue_t queue = NULL;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		queue = dispatch_queue_create("com.lucaspdf.editor.annotacoes", DISPATCH_QUEUE_SERIAL);
+	});
+
+	dispatch_async(queue, ^{
+		NSMutableDictionary *serialized = [NSMutableDictionary dictionary];
+		for (NSNumber *key in snapshot) {
+			NSArray *annotations = [snapshot objectForKey:key];
+			NSMutableArray *list = [NSMutableArray arrayWithCapacity:annotations.count];
+			for (Annotation *annotation in annotations) {
+				[list addObject:[annotation dictionaryRepresentation]];
+			}
+			[serialized setObject:list forKey:[key stringValue]];
+		}
+
+		NSData *data = [NSJSONSerialization dataWithJSONObject:serialized options:0 error:NULL];
+		if (data != nil) {
+			[data writeToFile:path atomically:YES];
+		}
+	});
 }
 
 - (void)load {
