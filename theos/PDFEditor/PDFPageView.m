@@ -91,22 +91,6 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		self.tool = EditorToolPencil;
 		self.multipleTouchEnabled = NO;
 		self.annotations = @[];
-
-		/* Cursor da borracha: circulo BRANCO que segue o dedo.
-		   Borda branca sólida, sem seleção de cor (a borracha sempre apaga). */
-		_eraserCursor = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 28, 28)];
-		_eraserCursor.hidden = YES;
-		_eraserCursor.userInteractionEnabled = NO;
-		_eraserCursor.backgroundColor = [UIColor clearColor];
-		_eraserCursor.layer.borderColor = [UIColor whiteColor].CGColor;
-		_eraserCursor.layer.borderWidth = 2.5;
-		_eraserCursor.layer.cornerRadius = 14.0;
-		// Sombra sutil para visibilidade sobre qualquer fundo
-		_eraserCursor.layer.shadowColor = [UIColor blackColor].CGColor;
-		_eraserCursor.layer.shadowOffset = CGSizeMake(0, 0);
-		_eraserCursor.layer.shadowOpacity = 0.4;
-		_eraserCursor.layer.shadowRadius = 2.0;
-		[self addSubview:_eraserCursor];
 	}
 	return self;
 }
@@ -297,10 +281,6 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	_eraserCursor.layer.borderColor = [UIColor whiteColor].CGColor;
 }
 
-- (void)hideEraserCursor {
-	_eraserCursor.hidden = YES;
-}
-
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	UITouch *touch = [touches anyObject];
 	CGPoint point = [touch locationInView:self];
@@ -312,7 +292,6 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 
 	if (self.tool == EditorToolEraser) {
 		[self eraseAtPoint:point];
-		[self updateEraserCursorAtPoint:point];
 		return;
 	}
 

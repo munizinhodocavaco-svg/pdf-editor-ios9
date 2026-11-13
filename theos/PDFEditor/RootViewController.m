@@ -108,15 +108,15 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 
 	CGFloat width = self.view.bounds.size.width;
 	CGFloat height = self.view.bounds.size.height;
-	CGFloat toolbarHeight = 92.0;
+	CGFloat toolbarHeight = 110.0;  // Aumentado para ícones maiores
 	CGFloat bottomHeight = 44.0;
 	CGFloat row1 = 6.0;
-	CGFloat row2 = 50.0;
+	CGFloat row2 = 58.0;  // Ajustado para toolbar mais alto
 
 	self.toolbar.frame = CGRectMake(0, 0, width, toolbarHeight);
-	// Ferramentas + tamanhos na mesma linha superior
-	self.toolControl.frame = CGRectMake(8, row1, 130, 32);
-	self.sizeControl.frame = CGRectMake(146, row1, 130, 32);
+	// Ferramentas + tamanhos na mesma linha superior - aumentados
+	self.toolControl.frame = CGRectMake(8, row1, 180, 44);   // Mais largo e alto
+	self.sizeControl.frame = CGRectMake(196, row1, 130, 44);  // Mais alto
 
 	// Cores: 3 botões + arco-íris
 	CGFloat colorX = 8.0;
@@ -168,14 +168,18 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 	[self.view addSubview:self.toolbar];
 
-	/* Ferramentas com símbolos Unicode enfileirados na mesma linha. */
-	self.toolControl = [[UISegmentedControl alloc] initWithItems:@[@"✎", @"⌫", @"▮"]];
+	/* Ferramentas com símbolos maiores e mais visíveis. */
+	// Aumenta altura do segmented control para ícones maiores
+	self.toolControl = [[UISegmentedControl alloc] initWithItems:@[@"✏️", @"🧽", @"🖍️"]];
 	self.toolControl.selectedSegmentIndex = 0;
+	// Aumenta fonte dos segmentos para ícones maiores
+	[self.toolControl setTitleTextAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:22.0]} forState:UIControlStateNormal];
 	[self.toolControl addTarget:self action:@selector(toolChanged:) forControlEvents:UIControlEventValueChanged];
 	[self.toolbar addSubview:self.toolControl];
 
 	self.sizeControl = [[UISegmentedControl alloc] initWithItems:@[@"1x", @"2x", @"3x"]];
 	self.sizeControl.selectedSegmentIndex = 0;
+	[self.sizeControl setTitleTextAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:16.0]} forState:UIControlStateNormal];
 	[self.sizeControl addTarget:self action:@selector(sizeChanged:) forControlEvents:UIControlEventValueChanged];
 	[self.toolbar addSubview:self.sizeControl];
 
