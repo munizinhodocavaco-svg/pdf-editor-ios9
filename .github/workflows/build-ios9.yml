@@ -37,7 +37,11 @@ jobs:
           #   ld: file not found: /usr/lib/system/liblaunch.dylib for architecture armv7
           curl -fsSL https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS10.3.sdk/usr/lib/system/liblaunch.tbd \
             -o "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd"
+          # O SDK 9.3 tambem nao traz libsystem_c.tbd (onde memcpy vive), entao copiamos do 10.3.
+          curl -fsSL https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS10.3.sdk/usr/lib/system/libsystem_c.tbd \
+            -o "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/libsystem_c.tbd"
           test -s "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd"
+          test -s "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/libsystem_c.tbd"
           ls -d "$THEOS/sdks/iPhoneOS9.3.sdk"
 
       - name: Instalar ldid (assinatura ad-hoc)

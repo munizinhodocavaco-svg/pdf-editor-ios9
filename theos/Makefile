@@ -19,7 +19,7 @@ PDFEditor_FILES = PDFEditor/main.m \
 	PDFEditor/Log.m
 PDFEditor_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
 PDFEditor_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
-PDFEditor_LDFLAGS = -Wl,-segalign,4000
+PDFEditor_LDFLAGS = -Wl,-segalign,4000 -lc
 PDFEditor_CODESIGN_FLAGS = -Sentitlements.plist
 PDFEditor_INSTALL_PATH = /Applications
 
