@@ -27,8 +27,12 @@ jobs:
       - name: Instalar SDK do iOS 9.3
         run: |
           export THEOS="$HOME/theos"
-          "$THEOS/bin/install-sdk" 9.3
-          ls -d "$THEOS"/sdks/iPhoneOS9.3.sdk
+          mkdir -p "$THEOS/sdks"
+          git clone --depth=1 --filter=blob:none --sparse https://github.com/theos/sdks /tmp/theos-sdks
+          cd /tmp/theos-sdks
+          git sparse-checkout set iPhoneOS9.3.sdk
+          cp -R iPhoneOS9.3.sdk "$THEOS/sdks/"
+          ls -d "$THEOS/sdks/iPhoneOS9.3.sdk"
 
       - name: Instalar ldid (assinatura ad-hoc)
         run: |
