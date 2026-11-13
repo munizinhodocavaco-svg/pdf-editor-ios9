@@ -1,12 +1,14 @@
 #import "DocumentListViewController.h"
 #import "RootViewController.h"
+#import "Log.h"
 
 @implementation DocumentListViewController
 
 - (void)viewDidLoad {
 	[super viewDidLoad];
+	PDFLog(@"Lista: viewDidLoad inicio");
 
-	self.title = @"PDF Editor";
+	self.title = @"PDF LM";
 	self.pdfFiles = @[];
 
 	self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
@@ -16,13 +18,15 @@
 	[self.view addSubview:self.tableView];
 
 	self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Recarregar"
-																			  style:UIBarButtonItemStylePlain
-																			 target:self
-																			 action:@selector(reloadTapped:)];
+																			 style:UIBarButtonItemStylePlain
+																			target:self
+																			action:@selector(reloadTapped:)];
+	PDFLog(@"Lista: viewDidLoad fim");
 }
 
 - (void)viewWillAppear:(BOOL)animated {
 	[super viewWillAppear:animated];
+	PDFLog(@"Lista: viewWillAppear");
 	[self reloadFiles];
 }
 
@@ -48,6 +52,7 @@
 		return [a.lastPathComponent compare:b.lastPathComponent];
 	}];
 
+	PDFLog(@"Lista: %lu PDF(s) em %@", (unsigned long)files.count, documents);
 	self.pdfFiles = files;
 	[self.tableView reloadData];
 	[self updateBackgroundView];
@@ -59,16 +64,36 @@
 		return;
 	}
 
-	UILabel *label = [[UILabel alloc] initWithFrame:self.tableView.bounds];
+	CGRect bounds = self.tableView.bounds;
+	UIView *container = [[UIView alloc] initWithFrame:bounds];
+	container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+	container.backgroundColor = [UIColor clearColor];
+
+	CGFloat y = bounds.size.height * 0.20;
+	UIImage *logo = [UIImage imageNamed:@"Logo.png"];
+	if (logo != nil) {
+		CGFloat side = 110.0;
+		UIImageView *imageView = [[UIImageView alloc] initWithImage:logo];
+		imageView.frame = CGRectMake((bounds.size.width - side) / 2.0, y, side, side);
+		imageView.contentMode = UIViewContentModeScaleAspectFit;
+		imageView.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
+		[container addSubview:imageView];
+		y += side + 20.0;
+	}
+
+	UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(28.0, y, bounds.size.width - 56.0, 150.0)];
 	label.numberOfLines = 0;
 	label.textAlignment = NSTextAlignmentCenter;
 	label.textColor = [UIColor grayColor];
 	label.font = [UIFont systemFontOfSize:16.0];
+	label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 	label.text = @"Nenhum PDF encontrado.\n\n"
 				 @"Copie arquivos PDF para a pasta Documentos deste app usando o 3uTools "
 				 @"(Gerenciador de Arquivos) ou o iTunes (Compartilhamento de Arquivos).\n\n"
 				 @"Depois toque em Recarregar.";
-	self.tableView.backgroundView = label;
+	[container addSubview:label];
+
+	self.tableView.backgroundView = container;
 }
 
 #pragma mark - UITableView
@@ -97,6 +122,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
 	NSURL *url = [self.pdfFiles objectAtIndex:indexPath.row];
+	PDFLog(@"Lista: abrindo %@", url.lastPathComponent);
 	RootViewController *controller = [[RootViewController alloc] initWithPDFURL:url];
 	[self.navigationController pushViewController:controller animated:YES];
 }

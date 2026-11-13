@@ -12,7 +12,8 @@ PDFEditor_FILES = PDFEditor/main.m \
 	PDFEditor/RootViewController.m \
 	PDFEditor/PDFPageView.m \
 	PDFEditor/Annotation.m \
-	PDFEditor/AnnotationStore.m
+	PDFEditor/AnnotationStore.m \
+	PDFEditor/Log.m
 PDFEditor_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
 PDFEditor_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
 PDFEditor_LDFLAGS = -Wl,-segalign,4000

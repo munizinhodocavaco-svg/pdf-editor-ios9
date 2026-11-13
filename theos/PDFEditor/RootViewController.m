@@ -1,6 +1,7 @@
-#import "RootViewController.h"
+﻿#import "RootViewController.h"
 #import "PDFPageView.h"
 #import "AnnotationStore.h"
+#import "Log.h"
 
 static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	CGRect rect = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
@@ -64,6 +65,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 
 - (void)viewDidLoad {
 	[super viewDidLoad];
+	PDFLog(@"Editor: viewDidLoad inicio (paginas=%lu)", (unsigned long)self.pageCount);
 
 	self.title = [self.pdfURL.lastPathComponent stringByDeletingPathExtension];
 	self.edgesForExtendedLayout = UIRectEdgeNone;
@@ -295,6 +297,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		return;
 	}
 	self.currentPage = page;
+	PDFLog(@"Editor: exibindo pagina %lu de %lu", (unsigned long)page, (unsigned long)self.pageCount);
 
 	CGPDFPageRef pdfPage = CGPDFDocumentGetPage(self.document, page);
 	self.pageView.page = pdfPage;

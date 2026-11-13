@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>pt_BR</string>
 	<key>CFBundleDisplayName</key>
-	<string>PDF Editor</string>
+	<string>PDF LM</string>
 	<key>CFBundleExecutable</key>
 	<string>PDFEditor</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>PDFEditor</string>
+	<string>PDF LM</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -22,6 +22,47 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>CFBundleIconFiles</key>
+	<array>
+		<string>Icon-29</string>
+		<string>Icon-40</string>
+		<string>Icon-57</string>
+		<string>Icon-60</string>
+		<string>Icon-72</string>
+		<string>Icon-76</string>
+		<string>Icon-167.png</string>
+	</array>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>Icon-29</string>
+				<string>Icon-40</string>
+				<string>Icon-60</string>
+				<string>Icon-76</string>
+				<string>Icon-167.png</string>
+			</array>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
+	<key>CFBundleIcons~ipad</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>Icon-29</string>
+				<string>Icon-40</string>
+				<string>Icon-76</string>
+				<string>Icon-167.png</string>
+			</array>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>MinimumOSVersion</key>
