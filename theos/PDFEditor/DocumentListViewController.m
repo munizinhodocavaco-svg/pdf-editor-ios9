@@ -1,5 +1,7 @@
 #import "DocumentListViewController.h"
 #import "RootViewController.h"
+#import "NetworkViewController.h"
+#import "WebServer.h"
 #import "Log.h"
 
 @implementation DocumentListViewController
@@ -21,7 +23,30 @@
 																			 style:UIBarButtonItemStylePlain
 																			target:self
 																			action:@selector(reloadTapped:)];
+	self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Importar"
+																			style:UIBarButtonItemStylePlain
+																		   target:self
+																		   action:@selector(importTapped:)];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(filesDidChange:)
+												 name:WebServerFilesDidChangeNotification
+											   object:nil];
 	PDFLog(@"Lista: viewDidLoad fim");
+}
+
+- (void)dealloc {
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)filesDidChange:(NSNotification *)notification {
+	[self reloadFiles];
+}
+
+- (void)importTapped:(id)sender {
+	NetworkViewController *controller = [[NetworkViewController alloc] init];
+	UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:controller];
+	nav.modalPresentationStyle = UIModalPresentationFormSheet;
+	[self presentViewController:nav animated:YES completion:nil];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -88,8 +113,9 @@
 	label.font = [UIFont systemFontOfSize:16.0];
 	label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 	label.text = @"Nenhum PDF encontrado.\n\n"
-				 @"Copie arquivos PDF para a pasta Documentos deste app usando o 3uTools "
-				 @"(Gerenciador de Arquivos) ou o iTunes (Compartilhamento de Arquivos).\n\n"
+				 @"Toque em Importar para enviar arquivos pelo navegador do computador "
+				 @"(Wi-Fi), baixar de um link, ou copie PDFs para a pasta Documentos "
+				 @"usando o 3uTools (Gerenciador de Arquivos) ou o iTunes.\n\n"
 				 @"Depois toque em Recarregar.";
 	[container addSubview:label];
 

@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 #import "DocumentListViewController.h"
+#import "WebServer.h"
 #import "Log.h"
 
 @implementation AppDelegate
@@ -18,6 +19,12 @@
 	self.window.backgroundColor = [UIColor whiteColor];
 	[self.window makeKeyAndVisible];
 	PDFLog(@"AppDelegate: janela visivel");
+
+	// Servidor de importacao por rede: fica ativo enquanto o app esta aberto.
+	WebServer *server = [WebServer sharedServer];
+	BOOL started = [server startOnPort:8080];
+	PDFLog(@"AppDelegate: servidor web %@ (erro=%@)", started ? @"ativo" : @"falhou", server.lastError);
+
 	return YES;
 }
 
