@@ -32,6 +32,12 @@ jobs:
           cd /tmp/theos-sdks
           git sparse-checkout set iPhoneOS9.3.sdk
           cp -R iPhoneOS9.3.sdk "$THEOS/sdks/"
+          # O SDK 9.3 de theos/sdks nao traz liblaunch.tbd, embora libSystem.B.tbd
+          # o re-exporte. Sem esse stub o ld falha com:
+          #   ld: file not found: /usr/lib/system/liblaunch.dylib for architecture armv7
+          curl -fsSL https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS10.3.sdk/usr/lib/system/liblaunch.tbd \
+            -o "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd"
+          test -s "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd"
           ls -d "$THEOS/sdks/iPhoneOS9.3.sdk"
 
       - name: Instalar ldid (assinatura ad-hoc)
