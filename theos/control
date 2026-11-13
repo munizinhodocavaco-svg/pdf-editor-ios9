@@ -1,5 +1,5 @@
-Package: com.lucaspdf.editor
-Name: PDF Editor
+﻿Package: com.lucaspdf.editor
+Name: Leitor / Editor Pdf LM
 Version: 1.0.0
 Architecture: iphoneos-arm
 Maintainer: Lucas Muniz

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Ipa = "$PSScriptRoot\theos\PDFEditor.ipa",
     [string]$Pdf = "",
     [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
@@ -28,4 +28,4 @@ if ($Pdf -ne "") {
     & $Python -m pymobiledevice3 apps push com.lucaspdf.editor $Pdf "Documents/$name"
 }
 
-Write-Host "==> Concluido. Abra o app 'PDF LM' no iPad."
+Write-Host "==> Concluido. Abra o app 'Leitor / Editor Pdf LM' no iPad."

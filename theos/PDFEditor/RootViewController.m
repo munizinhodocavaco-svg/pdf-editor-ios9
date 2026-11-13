@@ -1,6 +1,7 @@
 ﻿#import "RootViewController.h"
 #import "PDFPageView.h"
 #import "AnnotationStore.h"
+#import "ColorPickerViewController.h"
 #import "Log.h"
 
 static CGRect PageBoxRectForPage(CGPDFPageRef page) {
@@ -23,13 +24,18 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 @property (nonatomic, strong) UIView *toolbar;
 @property (nonatomic, strong) UIView *bottomBar;
 @property (nonatomic, strong) UISegmentedControl *toolControl;
+@property (nonatomic, strong) UISegmentedControl *sizeControl;
 @property (nonatomic, strong) NSMutableArray *colorButtons;
+@property (nonatomic, strong) UIButton *spectrumButton;
 @property (nonatomic, strong) UILabel *pageLabel;
 @property (nonatomic, strong) UIButton *undoButton;
 @property (nonatomic, strong) UIButton *saveButton;
 @property (nonatomic, strong) UIButton *shareButton;
+@property (nonatomic, strong) UIButton *replaceButton;
 @property (nonatomic, strong) UIButton *prevButton;
 @property (nonatomic, strong) UIButton *nextButton;
+
+@property (nonatomic, assign) BOOL replaceOriginal;
 
 /* Pilha de desfazer propria: o NSUndoManager do iOS 9 lanca excecao
    ("must begin a group before registering undo") quando groupsByEvent = NO,
@@ -37,6 +43,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 @property (nonatomic, strong) NSMutableArray *undoStack;
 @property (nonatomic, strong) UIColor *currentColor;
 @property (nonatomic, assign) EditorTool currentTool;
+@property (nonatomic, assign) CGFloat strokeScale;
 
 @end
 
@@ -49,6 +56,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		_currentPage = 1;
 		_currentTool = EditorToolPencil;
 		_currentColor = [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0];
+		_strokeScale = 1.0;
 		_undoStack = [NSMutableArray array];
 		_store = [[AnnotationStore alloc] initWithPDFURL:pdfURL];
 		_document = CGPDFDocumentCreateWithURL((__bridge CFURLRef)pdfURL);
@@ -79,8 +87,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	self.pageView = [[PDFPageView alloc] initWithFrame:CGRectZero];
 	self.pageView.delegate = self;
 	self.pageView.strokeColor = self.currentColor;
-	self.pageView.strokeWidth = 3.0;
-	self.pageView.tool = self.currentTool;
+	[self applyStrokeSettings];
 	[self.view addSubview:self.pageView];
 
 	if (self.pageCount == 0) {
@@ -101,25 +108,30 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 
 	CGFloat width = self.view.bounds.size.width;
 	CGFloat height = self.view.bounds.size.height;
-	CGFloat toolbarHeight = 52.0;
+	CGFloat toolbarHeight = 92.0;
 	CGFloat bottomHeight = 44.0;
-	CGFloat itemY = (toolbarHeight - 32.0) / 2.0;
+	CGFloat row1 = 6.0;
+	CGFloat row2 = 50.0;
 
 	self.toolbar.frame = CGRectMake(0, 0, width, toolbarHeight);
-	self.toolControl.frame = CGRectMake(8, itemY, 250, 32);
+	self.toolControl.frame = CGRectMake(8, row1, 230, 32);
+	self.sizeControl.frame = CGRectMake(246, row1, 150, 32);
 
-	CGFloat colorX = 270.0;
+	CGFloat colorX = 8.0;
 	for (UIButton *button in self.colorButtons) {
-		button.frame = CGRectMake(colorX, itemY + 1.0, 30, 30);
+		button.frame = CGRectMake(colorX, row2 + 1.0, 30, 30);
 		colorX += 36.0;
 	}
+	self.spectrumButton.frame = CGRectMake(colorX, row2 + 1.0, 30, 30);
 
 	CGFloat right = width - 8.0;
-	self.shareButton.frame = CGRectMake(right - 90.0, itemY, 90, 32);
+	self.shareButton.frame = CGRectMake(right - 90.0, row2, 90, 32);
 	right -= 96.0;
-	self.saveButton.frame = CGRectMake(right - 90.0, itemY, 90, 32);
+	self.saveButton.frame = CGRectMake(right - 90.0, row2, 90, 32);
 	right -= 96.0;
-	self.undoButton.frame = CGRectMake(right - 70.0, itemY, 70, 32);
+	self.replaceButton.frame = CGRectMake(right - 130.0, row2, 130, 32);
+	right -= 136.0;
+	self.undoButton.frame = CGRectMake(right - 70.0, row2, 70, 32);
 
 	self.pageView.frame = CGRectMake(0, toolbarHeight, width, height - toolbarHeight - bottomHeight);
 
@@ -159,6 +171,11 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	[self.toolControl addTarget:self action:@selector(toolChanged:) forControlEvents:UIControlEventValueChanged];
 	[self.toolbar addSubview:self.toolControl];
 
+	self.sizeControl = [[UISegmentedControl alloc] initWithItems:@[@"1x", @"2x", @"3x"]];
+	self.sizeControl.selectedSegmentIndex = 0;
+	[self.sizeControl addTarget:self action:@selector(sizeChanged:) forControlEvents:UIControlEventValueChanged];
+	[self.toolbar addSubview:self.sizeControl];
+
 	NSArray *colors = [self availableColors];
 	for (NSUInteger i = 0; i < colors.count; i++) {
 		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -172,12 +189,30 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		[self.toolbar addSubview:button];
 	}
 
+	/* Botao do espectro de cores (arco-iris). */
+	self.spectrumButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[self.spectrumButton setBackgroundImage:[self spectrumImageWithSize:CGSizeMake(30.0, 30.0)]
+								  forState:UIControlStateNormal];
+	self.spectrumButton.layer.cornerRadius = 5.0;
+	self.spectrumButton.layer.borderWidth = 2.0;
+	self.spectrumButton.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+	[self.spectrumButton addTarget:self action:@selector(spectrumTapped:)
+				  forControlEvents:UIControlEventTouchUpInside];
+	[self.toolbar addSubview:self.spectrumButton];
+	[self updateColorSelection];
+
 	self.undoButton = [self makeButton:@"Desfazer" action:@selector(undoTapped:)];
 	self.saveButton = [self makeButton:@"Salvar PDF" action:@selector(saveTapped:)];
 	self.shareButton = [self makeButton:@"Compartilhar" action:@selector(shareTapped:)];
+	self.replaceButton = [UIButton buttonWithType:UIButtonTypeSystem];
+	[self.replaceButton setTitle:@"Substituir original" forState:UIControlStateNormal];
+	self.replaceButton.titleLabel.font = [UIFont systemFontOfSize:13.0];
+	[self.replaceButton setTitleColor:[UIColor colorWithRed:0.8 green:0.2 blue:0.2 alpha:1.0] forState:UIControlStateNormal];
+	[self.replaceButton addTarget:self action:@selector(replaceToggled:) forControlEvents:UIControlEventTouchUpInside];
 	[self.toolbar addSubview:self.undoButton];
 	[self.toolbar addSubview:self.saveButton];
 	[self.toolbar addSubview:self.shareButton];
+	[self.toolbar addSubview:self.replaceButton];
 }
 
 - (void)setupBottomBar {
@@ -218,7 +253,22 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	} else {
 		self.currentTool = EditorToolHighlighter;
 	}
+	[self applyStrokeSettings];
+}
+
+- (void)sizeChanged:(UISegmentedControl *)sender {
+	self.strokeScale = (CGFloat)(sender.selectedSegmentIndex + 1);
+	[self applyStrokeSettings];
+	PDFLog(@"Editor: tamanho %ldx", (long)(sender.selectedSegmentIndex + 1));
+}
+
+/* Espessuras proporcionais: 1x, 2x e 3x para lapis, borracha e marcador. */
+- (void)applyStrokeSettings {
+	CGFloat scale = self.strokeScale > 0.0 ? self.strokeScale : 1.0;
+	CGFloat base = (self.currentTool == EditorToolHighlighter) ? 4.0 : 2.5;
 	self.pageView.tool = self.currentTool;
+	self.pageView.strokeWidth = base * scale;
+	self.pageView.eraserWidth = 12.0 * scale;
 }
 
 - (void)colorTapped:(UIButton *)sender {
@@ -226,15 +276,78 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	if (sender.tag < 0 || sender.tag >= (NSInteger)colors.count) {
 		return;
 	}
-	self.currentColor = [colors objectAtIndex:sender.tag];
-	self.pageView.strokeColor = self.currentColor;
+	[self applyColor:[colors objectAtIndex:sender.tag]];
+}
 
-	for (UIButton *button in self.colorButtons) {
-		button.layer.borderColor = (button == sender)
+- (void)spectrumTapped:(id)sender {
+	ColorPickerViewController *picker = [[ColorPickerViewController alloc] init];
+	picker.initialColor = self.currentColor;
+	__weak RootViewController *weakSelf = self;
+	picker.onColorSelected = ^(UIColor *color) {
+		if (color != nil) {
+			[weakSelf applyColor:color];
+		}
+	};
+	UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:picker];
+	nav.modalPresentationStyle = UIModalPresentationFormSheet;
+	[self presentViewController:nav animated:YES completion:nil];
+}
+
+- (void)applyColor:(UIColor *)color {
+	_currentColor = color;
+	self.pageView.strokeColor = color;
+	[self updateColorSelection];
+}
+
+- (void)replaceToggled:(id)sender {
+	_replaceOriginal = !_replaceOriginal;
+	[self.replaceButton setTitle:_replaceOriginal ? @"✓ Substituir original" : @"Substituir original"
+						 forState:UIControlStateNormal];
+	[self.replaceButton setTitleColor:_replaceOriginal ? [UIColor colorWithRed:0.2 green:0.7 blue:0.2 alpha:1.0]
+														  : [UIColor colorWithRed:0.8 green:0.2 blue:0.2 alpha:1.0]
+						  forState:UIControlStateNormal];
+	PDFLog(@"Editor: substituir original = %@", _replaceOriginal ? @"SIM" : @"NÃO");
+}
+
+- (void)updateColorSelection {
+	NSArray *colors = [self availableColors];
+	for (NSUInteger i = 0; i < self.colorButtons.count; i++) {
+		UIButton *button = [self.colorButtons objectAtIndex:i];
+		UIColor *color = i < colors.count ? [colors objectAtIndex:i] : nil;
+		BOOL selected = (color != nil && [color isEqual:self.currentColor]);
+		button.layer.borderColor = selected
 			? [UIColor colorWithRed:0.1 green:0.45 blue:0.9 alpha:1.0].CGColor
 			: [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
-		button.layer.borderWidth = (button == sender) ? 3.0 : 2.0;
+		button.layer.borderWidth = selected ? 3.0 : 2.0;
 	}
+
+	BOOL custom = YES;
+	for (UIColor *color in colors) {
+		if ([color isEqual:self.currentColor]) {
+			custom = NO;
+			break;
+		}
+	}
+	self.spectrumButton.layer.borderColor = custom
+		? [UIColor colorWithRed:0.1 green:0.45 blue:0.9 alpha:1.0].CGColor
+		: [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+	self.spectrumButton.layer.borderWidth = custom ? 3.0 : 2.0;
+}
+
+/* Imagem arco-iris para o botao do espectro de cores. */
+- (UIImage *)spectrumImageWithSize:(CGSize)size {
+	UIGraphicsBeginImageContextWithOptions(size, NO, 1.0);
+	NSInteger strips = 60;
+	for (NSInteger i = 0; i < strips; i++) {
+		CGFloat hue = (CGFloat)i / (CGFloat)strips;
+		[[UIColor colorWithHue:hue saturation:1.0 brightness:1.0 alpha:1.0] setFill];
+		CGRect strip = CGRectMake(size.width * (CGFloat)i / (CGFloat)strips, 0.0,
+								  size.width / (CGFloat)strips + 1.0, size.height);
+		UIRectFill(strip);
+	}
+	UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+	return image;
 }
 
 - (void)undoTapped:(id)sender {
@@ -264,11 +377,20 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	NSString *name = [[self.pdfURL.lastPathComponent stringByDeletingPathExtension] stringByAppendingString:@"-anotado.pdf"];
 	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 	NSString *documents = [paths objectAtIndex:0];
-	NSString *path = [documents stringByAppendingPathComponent:name];
+	
+	NSString *path;
+	if (_replaceOriginal) {
+		path = self.pdfURL.path;
+	} else {
+		path = [documents stringByAppendingPathComponent:name];
+	}
 
 	if ([self writeAnnotatedPDFToPath:path]) {
+		NSString *message = _replaceOriginal
+			? [NSString stringWithFormat:@"Arquivo original substituído:\n%@", self.pdfURL.lastPathComponent]
+			: [NSString stringWithFormat:@"Arquivo salvo em Documentos:\n%@", name];
 		UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"PDF salvo"
-														message:[NSString stringWithFormat:@"Arquivo salvo em Documentos:\n%@", name]
+														message:message
 													   delegate:nil
 											  cancelButtonTitle:@"OK"
 											  otherButtonTitles:nil];

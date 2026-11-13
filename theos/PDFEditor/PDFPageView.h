@@ -26,6 +26,7 @@ typedef NS_ENUM(NSInteger, EditorTool) {
 @property (nonatomic, assign) EditorTool tool;
 @property (nonatomic, strong) UIColor *strokeColor;
 @property (nonatomic, assign) CGFloat strokeWidth;
+@property (nonatomic, assign) CGFloat eraserWidth;
 @property (nonatomic, strong) NSArray *annotations;
 @property (nonatomic, weak) id<PDFPageViewDelegate> delegate;
 

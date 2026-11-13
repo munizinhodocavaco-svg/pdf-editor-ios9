@@ -1,4 +1,4 @@
-#import "DocumentListViewController.h"
+﻿#import "DocumentListViewController.h"
 #import "RootViewController.h"
 #import "NetworkViewController.h"
 #import "WebServer.h"
@@ -10,7 +10,7 @@
 	[super viewDidLoad];
 	PDFLog(@"Lista: viewDidLoad inicio");
 
-	self.title = @"PDF LM";
+	self.title = @"Leitor / Editor Pdf LM";
 	self.pdfFiles = @[];
 
 	self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
@@ -151,6 +151,36 @@
 	PDFLog(@"Lista: abrindo %@", url.lastPathComponent);
 	RootViewController *controller = [[RootViewController alloc] initWithPDFURL:url];
 	[self.navigationController pushViewController:controller animated:YES];
+}
+
+- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
+	return YES;
+}
+
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
+	return UITableViewCellEditingStyleDelete;
+}
+
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+	if (editingStyle == UITableViewCellEditingStyleDelete) {
+		NSURL *url = [self.pdfFiles objectAtIndex:indexPath.row];
+		NSString *name = url.lastPathComponent;
+		
+		// Também remove o arquivo de anotações associado, se existir
+		NSString *annotationPath = [url.path stringByAppendingString:@".annotations.json"];
+		
+		NSError *error = nil;
+		NSFileManager *fm = [NSFileManager defaultManager];
+		BOOL success = [fm removeItemAtPath:url.path error:&error];
+		if (success) {
+			[fm removeItemAtPath:annotationPath error:NULL];
+			PDFLog(@"Lista: arquivo excluído %@", name);
+		} else {
+			PDFLog(@"Lista: erro ao excluir %@: %@", name, error.localizedDescription);
+		}
+		
+		[self reloadFiles];
+	}
 }
 
 @end

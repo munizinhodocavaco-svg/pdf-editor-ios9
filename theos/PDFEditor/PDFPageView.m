@@ -82,7 +82,8 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		self.opaque = YES;
 		self.clearsContextBeforeDrawing = NO;
 		self.strokeColor = [UIColor blackColor];
-		self.strokeWidth = 3.0;
+		self.strokeWidth = 2.5;
+		self.eraserWidth = 12.0;
 		self.tool = EditorToolPencil;
 		self.multipleTouchEnabled = NO;
 		self.annotations = @[];
@@ -382,9 +383,10 @@ static CGFloat DistanceToSegment(CGPoint point, CGPoint start, CGPoint end) {
 
 - (BOOL)annotation:(Annotation *)annotation hitsPoint:(CGPoint)point {
 	CGRect display = [self pageDisplayRect];
-	CGFloat tolerance = 12.0;
+	/* A borracha acompanha o tamanho escolhido (1x, 2x, 3x). */
+	CGFloat tolerance = MAX(6.0, self.eraserWidth * 0.5 + 6.0);
 	if (annotation.type == AnnotationTypeHighlighter) {
-		tolerance = 16.0;
+		tolerance += 4.0;
 	}
 
 	CGPoint previous = CGPointZero;

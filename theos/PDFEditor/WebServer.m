@@ -320,7 +320,7 @@ static NSString *PDFHTMLPage(void) {
 	return [NSString stringWithFormat:
 		@"<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">"
 		 "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-		 "<title>PDF LM - Importar</title><style>"
+		 "<title>Leitor / Editor Pdf LM - Importar</title><style>"
 		 "body{font-family:-apple-system,Helvetica,Arial,sans-serif;background:#f4f5f7;color:#222;margin:0;padding:32px}"
 		 ".card{max-width:720px;margin:0 auto;background:#fff;border-radius:14px;padding:28px;"
 		 "box-shadow:0 6px 24px rgba(0,0,0,.10)}"
@@ -334,7 +334,7 @@ static NSString *PDFHTMLPage(void) {
 		 ".empty{color:#888}.tip{margin-top:22px;font-size:13px;color:#777;line-height:1.5}"
 		 "code{background:#eef1f7;padding:2px 6px;border-radius:5px}"
 		 "</style></head><body><div class=\"card\">"
-		 "<h1>PDF LM</h1><p class=\"sub\">Envie arquivos PDF para o iPad em %@</p>"
+		 "<h1>Leitor / Editor Pdf LM</h1><p class=\"sub\">Envie arquivos PDF para o iPad em %@</p>"
 		 "<form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\">"
 		 "<input type=\"file\" name=\"files\" accept=\"application/pdf\" multiple required><br>"
 		 "<button type=\"submit\">Enviar para o iPad</button></form>"
