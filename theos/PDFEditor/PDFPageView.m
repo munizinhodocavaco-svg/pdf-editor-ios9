@@ -92,15 +92,20 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		self.multipleTouchEnabled = NO;
 		self.annotations = @[];
 
-		/* Cursor da borracha: circulo vermelho que segue o dedo.
-		   Usa UIView com borda solida (borderDashPattern nao existe no iOS 9). */
+		/* Cursor da borracha: circulo BRANCO que segue o dedo.
+		   Borda branca sólida, sem seleção de cor (a borracha sempre apaga). */
 		_eraserCursor = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 28, 28)];
 		_eraserCursor.hidden = YES;
 		_eraserCursor.userInteractionEnabled = NO;
 		_eraserCursor.backgroundColor = [UIColor clearColor];
-		_eraserCursor.layer.borderColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:0.9].CGColor;
-		_eraserCursor.layer.borderWidth = 2.0;
+		_eraserCursor.layer.borderColor = [UIColor whiteColor].CGColor;
+		_eraserCursor.layer.borderWidth = 2.5;
 		_eraserCursor.layer.cornerRadius = 14.0;
+		// Sombra sutil para visibilidade sobre qualquer fundo
+		_eraserCursor.layer.shadowColor = [UIColor blackColor].CGColor;
+		_eraserCursor.layer.shadowOffset = CGSizeMake(0, 0);
+		_eraserCursor.layer.shadowOpacity = 0.4;
+		_eraserCursor.layer.shadowRadius = 2.0;
 		[self addSubview:_eraserCursor];
 	}
 	return self;
@@ -288,8 +293,8 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	CGFloat radius = self.eraserWidth / 2.0 + 6.0; // raio visual um pouco maior que a area de apagamento
 	_eraserCursor.frame = CGRectMake(point.x - radius, point.y - radius, radius * 2.0, radius * 2.0);
 	_eraserCursor.hidden = NO;
-	// Atualiza cor da borda para combinar com a cor do lapis atual (feedback visual)
-	_eraserCursor.layer.borderColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:0.9].CGColor;
+	// Borda sempre branca (a borracha não tem cor)
+	_eraserCursor.layer.borderColor = [UIColor whiteColor].CGColor;
 }
 
 - (void)hideEraserCursor {

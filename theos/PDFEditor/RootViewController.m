@@ -114,9 +114,11 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	CGFloat row2 = 50.0;
 
 	self.toolbar.frame = CGRectMake(0, 0, width, toolbarHeight);
-	self.toolControl.frame = CGRectMake(8, row1, 230, 32);
-	self.sizeControl.frame = CGRectMake(246, row1, 150, 32);
+	// Ferramentas + tamanhos na mesma linha superior
+	self.toolControl.frame = CGRectMake(8, row1, 130, 32);
+	self.sizeControl.frame = CGRectMake(146, row1, 130, 32);
 
+	// Cores: 3 botões + arco-íris
 	CGFloat colorX = 8.0;
 	for (UIButton *button in self.colorButtons) {
 		button.frame = CGRectMake(colorX, row2 + 1.0, 30, 30);
@@ -166,7 +168,8 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 	[self.view addSubview:self.toolbar];
 
-	self.toolControl = [[UISegmentedControl alloc] initWithItems:@[@"Lapis", @"Borracha", @"Marcador"]];
+	/* Ferramentas com símbolos Unicode enfileirados na mesma linha. */
+	self.toolControl = [[UISegmentedControl alloc] initWithItems:@[@"✎", @"⌫", @"▮"]];
 	self.toolControl.selectedSegmentIndex = 0;
 	[self.toolControl addTarget:self action:@selector(toolChanged:) forControlEvents:UIControlEventValueChanged];
 	[self.toolbar addSubview:self.toolControl];
@@ -184,12 +187,16 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		button.layer.cornerRadius = 5.0;
 		button.layer.borderWidth = 2.0;
 		button.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+		// Branco precisa de borda visível
+		if (i == 1) {
+			button.layer.borderColor = [UIColor colorWithWhite:0.5 alpha:1.0].CGColor;
+		}
 		[button addTarget:self action:@selector(colorTapped:) forControlEvents:UIControlEventTouchUpInside];
 		[self.colorButtons addObject:button];
 		[self.toolbar addSubview:button];
 	}
 
-	/* Botao do espectro de cores (arco-iris). */
+	/* Botão do seletor HSV (arco-íris) — substitui o espectro de cores antigo. */
 	self.spectrumButton = [UIButton buttonWithType:UIButtonTypeCustom];
 	[self.spectrumButton setBackgroundImage:[self spectrumImageWithSize:CGSizeMake(30.0, 30.0)]
 								  forState:UIControlStateNormal];
@@ -234,11 +241,9 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 
 - (NSArray *)availableColors {
 	return @[
-		[UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0],
-		[UIColor colorWithRed:0.85 green:0.10 blue:0.10 alpha:1.0],
-		[UIColor colorWithRed:0.10 green:0.30 blue:0.90 alpha:1.0],
-		[UIColor colorWithRed:0.10 green:0.60 blue:0.20 alpha:1.0],
-		[UIColor colorWithRed:1.0 green:0.80 blue:0.0 alpha:1.0]
+		[UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0],   // Preto
+		[UIColor colorWithRed:1.0 green:1.0 blue:1.0 alpha:1.0],   // Branco
+		[UIColor colorWithRed:0.9 green:0.15 blue:0.15 alpha:1.0]  // Vermelho
 	];
 }
 
@@ -254,6 +259,14 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		self.currentTool = EditorToolHighlighter;
 	}
 	[self applyStrokeSettings];
+	// Borracha não usa cor: desabilita botões de cor
+	BOOL colorEnabled = (self.currentTool != EditorToolEraser);
+	for (UIButton *button in self.colorButtons) {
+		button.enabled = colorEnabled;
+		button.alpha = colorEnabled ? 1.0 : 0.4;
+	}
+	self.spectrumButton.enabled = colorEnabled;
+	self.spectrumButton.alpha = colorEnabled ? 1.0 : 0.4;
 }
 
 - (void)sizeChanged:(UISegmentedControl *)sender {

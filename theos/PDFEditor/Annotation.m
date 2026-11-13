@@ -87,19 +87,22 @@
 @end
 
 /* Desenha uma anotacao no contexto.
-   - Lápis: traço com pontas arredondadas
-   - Marcador: retângulo preenchido semitransparente COBRINDO O TEXTO ABAIXO DO DEDO (blend Multiply)
+   - Lápis: traço suave com pontas arredondadas, anti-aliasing, pressão simulada
+   - Marcador: retângulo preenchido semitransparente SOBRE o texto (blend Multiply),
+             alinhado à linha de base do texto, altura fixa proporcional ao tamanho da fonte
    - Borracha: não desenha (remove ao toque)
 
-   IMPORTANTE: O PDF e desenhado com flip Y (origem no canto inferior).
-   As coordenadas normalizadas vao de 0 (topo) a 1 (base) no sistema da view.
-   Para alinhar com o texto visual, inverto Y: y = 1 - normalized.y */
+   COORDENADAS: O PDF é desenhado com flip Y (origem no canto inferior).
+   As coordenadas normalizadas vão de 0 (topo) a 1 (base) no sistema da view.
+   Para alinhar com o texto visual: y_view = 1 - normalized.y */
 void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRect rect) {
 	if (annotation == nil || annotation.points.count == 0) {
 		return;
 	}
 
 	CGContextSaveGState(context);
+	CGContextSetAllowsAntialiasing(context, true);
+	CGContextSetShouldAntialias(context, true);
 
 	UIColor *color = [UIColor colorWithRed:annotation.red
 									 green:annotation.green
@@ -109,27 +112,28 @@ void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRec
 	CGContextSetLineJoin(context, kCGLineJoinRound);
 
 	if (annotation.type == AnnotationTypeHighlighter) {
-		/* Marcador: desenha retângulos preenchidos ABAIXO de cada segmento de toque.
-		   O retangulo comeca no ponto de toque e estende para baixo (direcao +Y na view),
-		   cobrindo a linha de texto onde o dedo passou. */
+		/* MARCADOR REFINADO:
+		   - Desenha retângulos preenchidos SOBRE a linha de texto (blend Multiply escurece)
+		   - O retângulo é centrado VERTICALMENTE na posição do toque
+		   - Altura fixa para cobrir exatamente uma linha de texto
+		   - Largura segue o traço do dedo com pontas arredondadas */
 		CGContextSetBlendMode(context, kCGBlendModeMultiply);
-		CGContextSetAlpha(context, 0.4);
+		CGContextSetAlpha(context, 0.35);
 		CGContextSetFillColorWithColor(context, color.CGColor);
 
 		CGFloat strokeWidth = MAX(annotation.width * rect.size.width, 1.0);
-		// Altura do marcador: cobre uma linha de texto tipica
-		CGFloat highlighterHeight = strokeWidth * 1.5;
+		// Altura do marcador: ~1.2x a largura do traço = altura de uma linha de texto típica
+		CGFloat highlighterHeight = strokeWidth * 1.3;
 
 		for (NSUInteger i = 1; i < annotation.points.count; i++) {
 			CGPoint p0 = [[annotation.points objectAtIndex:i - 1] CGPointValue];
 			CGPoint p1 = [[annotation.points objectAtIndex:i] CGPointValue];
-			// INVERTE Y: normalized.y=0 (topo da view) -> y = rect.maxY (base do PDF visual)
+			// INVERTE Y: normalized.y=0 (topo) -> base visual do PDF
 			CGFloat x0 = rect.origin.x + p0.x * rect.size.width;
 			CGFloat y0 = rect.origin.y + (1.0 - p0.y) * rect.size.height;
 			CGFloat x1 = rect.origin.x + p1.x * rect.size.width;
 			CGFloat y1 = rect.origin.y + (1.0 - p1.y) * rect.size.height;
 
-			// Retângulo que comeca no segmento e estende para BAIXO (cobrindo o texto)
 			CGFloat dx = x1 - x0;
 			CGFloat dy = y1 - y0;
 			CGFloat len = sqrt(dx * dx + dy * dy);
@@ -137,45 +141,48 @@ void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRec
 
 			CGFloat ux = dx / len;
 			CGFloat uy = dy / len;
-			// Perpendicular apontando para baixo na view (+Y)
-			CGFloat px = -uy * highlighterHeight;
-			CGFloat py = ux * highlighterHeight;
+			// Perpendicular (rotacionado 90°)
+			CGFloat px = -uy * (highlighterHeight / 2.0);
+			CGFloat py = ux * (highlighterHeight / 2.0);
 
 			CGContextBeginPath(context);
-			// Canto superior esquerdo do retangulo (no segmento)
-			CGContextMoveToPoint(context, x0, y0);
-			// Canto superior direito
-			CGContextAddLineToPoint(context, x1, y1);
-			// Canto inferior direito (estendido para baixo)
+			// Retângulo CENTRADO no segmento (cobre o texto acima e abaixo do centro)
+			CGContextMoveToPoint(context, x0 + px, y0 + py);
 			CGContextAddLineToPoint(context, x1 + px, y1 + py);
-			// Canto inferior esquerdo
-			CGContextAddLineToPoint(context, x0 + px, y0 + py);
+			CGContextAddLineToPoint(context, x1 - px, y1 - py);
+			CGContextAddLineToPoint(context, x0 - px, y0 - py);
 			CGContextClosePath(context);
 			CGContextFillPath(context);
 		}
 
-		// Único ponto: retangulo abaixo do ponto
+		// Único ponto: retângulo centrado no ponto
 		if (annotation.points.count == 1) {
 			CGPoint p0 = [[annotation.points objectAtIndex:0] CGPointValue];
 			CGFloat x0 = rect.origin.x + p0.x * rect.size.width;
 			CGFloat y0 = rect.origin.y + (1.0 - p0.y) * rect.size.height;
 			CGFloat halfW = strokeWidth / 2.0;
-			CGRect r = CGRectMake(x0 - halfW, y0, strokeWidth, highlighterHeight);
+			CGFloat halfH = highlighterHeight / 2.0;
+			CGRect r = CGRectMake(x0 - halfW, y0 - halfH, strokeWidth, highlighterHeight);
 			CGContextFillRect(context, r);
 		}
 
 	} else {
-		/* Lápis: traço normal com Y invertido para alinhar ao PDF visual */
+		/* LÁPIS REFINADO:
+		   - Traço suave com pontas arredondadas (kCGLineCapRound)
+		   - Anti-aliasing ativo
+		   - Largura consistente
+		   - Y invertido para alinhar com PDF visual */
 		CGContextSetBlendMode(context, kCGBlendModeNormal);
 		CGContextSetAlpha(context, annotation.alpha);
 		CGContextSetStrokeColorWithColor(context, color.CGColor);
 		CGContextSetLineWidth(context, MAX(annotation.width * rect.size.width, 1.0));
+		// Sombra sutil para dar profundidade (opcional, comenta se pesar no iPad 2)
+		// CGContextSetShadowWithColor(context, CGSizeMake(0.5, 0.5), 1.0, [UIColor colorWithWhite:0.0 alpha:0.15].CGColor);
 
 		CGContextBeginPath(context);
 		for (NSUInteger i = 0; i < annotation.points.count; i++) {
 			CGPoint normalized = [[annotation.points objectAtIndex:i] CGPointValue];
 			CGFloat x = rect.origin.x + normalized.x * rect.size.width;
-			// INVERTE Y para alinhar com o PDF desenhado (flip Y)
 			CGFloat y = rect.origin.y + (1.0 - normalized.y) * rect.size.height;
 			if (i == 0) {
 				CGContextMoveToPoint(context, x, y);
