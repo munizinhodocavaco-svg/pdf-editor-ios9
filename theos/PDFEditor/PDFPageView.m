@@ -92,7 +92,8 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		self.multipleTouchEnabled = NO;
 		self.annotations = @[];
 
-		/* Cursor da borracha: circulo tracejado que segue o dedo. */
+		/* Cursor da borracha: circulo vermelho que segue o dedo.
+		   Usa UIView com borda solida (borderDashPattern nao existe no iOS 9). */
 		_eraserCursor = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 28, 28)];
 		_eraserCursor.hidden = YES;
 		_eraserCursor.userInteractionEnabled = NO;
@@ -100,7 +101,6 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		_eraserCursor.layer.borderColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:0.9].CGColor;
 		_eraserCursor.layer.borderWidth = 2.0;
 		_eraserCursor.layer.cornerRadius = 14.0;
-		_eraserCursor.layer.borderDashPattern = @[@4, @3];
 		[self addSubview:_eraserCursor];
 	}
 	return self;
