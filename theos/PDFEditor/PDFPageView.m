@@ -10,8 +10,6 @@
 	   por cima, entao o custo por quadro nao cresce com a quantidade de tracos. */
 	CGImageRef _compositeImage;
 	CGSize _compositeSize;
-	/* Cursor visual da borracha (circulo que segue o dedo). */
-	UIView *_eraserCursor;
 }
 
 @property (nonatomic, strong) Annotation *currentAnnotation;
@@ -20,8 +18,6 @@
 
 - (void)invalidatePageImage;
 - (void)invalidateCompositeImage;
-- (void)updateEraserCursorAtPoint:(CGPoint)point;
-- (void)hideEraserCursor;
 
 @end
 
@@ -259,26 +255,6 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 - (CGFloat)dirtyPadding {
 	CGFloat width = (self.tool == EditorToolHighlighter) ? MAX(self.strokeWidth * 4.0, 14.0) : self.strokeWidth;
 	return width / 2.0 + 8.0;
-}
-
-#pragma mark - Cursor da Borracha
-
-- (void)updateEraserCursorAtPoint:(CGPoint)point {
-	if (self.tool != EditorToolEraser) {
-		[self hideEraserCursor];
-		return;
-	}
-	CGRect display = [self pageDisplayRect];
-	// So mostra se estiver sobre a pagina
-	if (!CGRectContainsPoint(display, point)) {
-		[self hideEraserCursor];
-		return;
-	}
-	CGFloat radius = self.eraserWidth / 2.0 + 6.0; // raio visual um pouco maior que a area de apagamento
-	_eraserCursor.frame = CGRectMake(point.x - radius, point.y - radius, radius * 2.0, radius * 2.0);
-	_eraserCursor.hidden = NO;
-	// Borda sempre branca (a borracha não tem cor)
-	_eraserCursor.layer.borderColor = [UIColor whiteColor].CGColor;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
