@@ -1,0 +1,7 @@
+theos/packages/
+theos/.theos/
+theos/build/
+theos/PDFEditor.ipa
+*.ipa
+*.deb
+.DS_Store
