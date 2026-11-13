@@ -85,7 +85,7 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		self.strokeWidth = 3.0;
 		self.tool = EditorToolPencil;
 		self.multipleTouchEnabled = NO;
-		self.sortedAnnotations = @[];
+		self.annotations = @[];
 	}
 	return self;
 }
