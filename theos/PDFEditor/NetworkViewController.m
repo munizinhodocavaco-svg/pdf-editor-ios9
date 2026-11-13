@@ -322,9 +322,9 @@
 				NSFileManager *fm = [NSFileManager defaultManager];
 				if ([fm fileExistsAtPath:destination]) {
 					NSString *base = [name stringByDeletingPathExtension];
-					destination = [directory stringByAppendingPathComponent:
-								   [NSString stringWithFormat:@"%@ (%@).pdf", base,
-									[[[NSUUID UUID] UUIDString] substringToIndex:4]];
+					NSString *suffix = [[[NSUUID UUID] UUIDString] substringToIndex:4];
+					NSString *renamed = [NSString stringWithFormat:@"%@ (%@).pdf", base, suffix];
+					destination = [directory stringByAppendingPathComponent:renamed];
 				}
 				NSError *moveError = nil;
 				if (![fm moveItemAtURL:location toURL:[NSURL fileURLWithPath:destination] error:&moveError]) {
