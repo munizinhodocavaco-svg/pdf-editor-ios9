@@ -6,11 +6,18 @@
 	   CGContextDrawPDFPage rodava a cada toque, o que travava o iPad 2. */
 	CGImageRef _pageImage;
 	CGSize _pageImageSize;
+	/* Pagina + tracos ja concluidos. Durante um traco novo so ele e desenhado
+	   por cima, entao o custo por quadro nao cresce com a quantidade de tracos. */
+	CGImageRef _compositeImage;
+	CGSize _compositeSize;
 }
 
 @property (nonatomic, strong) Annotation *currentAnnotation;
 @property (nonatomic, assign) CGPoint lastPoint;
 @property (nonatomic, strong) NSArray *sortedAnnotations;
+
+- (void)invalidatePageImage;
+- (void)invalidateCompositeImage;
 
 @end
 
@@ -25,6 +32,10 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 }
 
 - (void)dealloc {
+	if (_compositeImage != NULL) {
+		CGImageRelease(_compositeImage);
+		_compositeImage = NULL;
+	}
 	if (_pageImage != NULL) {
 		CGImageRelease(_pageImage);
 		_pageImage = NULL;
@@ -60,6 +71,7 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		}
 		return (a.type < b.type) ? NSOrderedAscending : NSOrderedDescending;
 	}];
+	[self invalidateCompositeImage];
 	[self setNeedsDisplay];
 }
 
@@ -91,7 +103,16 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		_pageImage = NULL;
 	}
 	_pageImageSize = CGSizeZero;
+	[self invalidateCompositeImage];
 	[self setNeedsDisplay];
+}
+
+- (void)invalidateCompositeImage {
+	if (_compositeImage != NULL) {
+		CGImageRelease(_compositeImage);
+		_compositeImage = NULL;
+	}
+	_compositeSize = CGSizeZero;
 }
 
 /* Retangulo, em coordenadas da view, onde a pagina PDF e desenhada. */
@@ -159,10 +180,52 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	return _pageImage;
 }
 
+- (void)drawAnnotatedPageInContext:(CGContextRef)context {
+	CGImageRef page = [self cachedPageImage];
+	CGRect display = [self pageDisplayRect];
+	if (page != NULL) {
+		CGContextSetInterpolationQuality(context, kCGInterpolationNone);
+		CGContextDrawImage(context, self.bounds, page);
+	} else {
+		CGContextSetFillColorWithColor(context, [UIColor whiteColor].CGColor);
+		CGContextFillRect(context, self.bounds);
+	}
+	/* Marcador primeiro (fica por baixo do lapis). */
+	for (Annotation *annotation in self.sortedAnnotations) {
+		DrawAnnotationInContext(context, annotation, display);
+	}
+}
+
+/* Pagina + tracos concluidos, pronta para ser "colada" a cada quadro. */
+- (CGImageRef)cachedCompositeImage {
+	CGSize size = self.bounds.size;
+	if (size.width < 1.0 || size.height < 1.0) {
+		return NULL;
+	}
+	if (_compositeImage != NULL && CGSizeEqualToSize(_compositeSize, size)) {
+		return _compositeImage;
+	}
+	if (_compositeImage != NULL) {
+		CGImageRelease(_compositeImage);
+		_compositeImage = NULL;
+	}
+
+	UIGraphicsBeginImageContextWithOptions(size, YES, 1.0);
+	CGContextRef context = UIGraphicsGetCurrentContext();
+	[self drawAnnotatedPageInContext:context];
+	UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+	if (image.CGImage != NULL) {
+		_compositeImage = CGImageRetain(image.CGImage);
+		_compositeSize = size;
+	}
+	UIGraphicsEndImageContext();
+	return _compositeImage;
+}
+
 - (void)drawRect:(CGRect)rect {
 	CGContextRef context = UIGraphicsGetCurrentContext();
 
-	CGImageRef image = [self cachedPageImage];
+	CGImageRef image = [self cachedCompositeImage];
 	if (image != NULL) {
 		CGContextSetInterpolationQuality(context, kCGInterpolationNone);
 		CGContextDrawImage(context, self.bounds, image);
@@ -171,14 +234,9 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		CGContextFillRect(context, rect);
 	}
 
-	CGRect display = [self pageDisplayRect];
-	/* Marcador primeiro (fica por baixo do lapis). */
-	for (Annotation *annotation in self.sortedAnnotations) {
-		DrawAnnotationInContext(context, annotation, display);
-	}
-
+	/* Somente o traco em andamento e redesenhado a cada movimento. */
 	if (self.currentAnnotation != nil) {
-		DrawAnnotationInContext(context, self.currentAnnotation, display);
+		DrawAnnotationInContext(context, self.currentAnnotation, [self pageDisplayRect]);
 	}
 }
 
