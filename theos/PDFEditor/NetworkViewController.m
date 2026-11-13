@@ -240,7 +240,7 @@
 
 - (void)refreshLayout {
 	[self.view setNeedsLayout];
-	[self layoutIfNeeded];
+	[self.view layoutIfNeeded];
 }
 
 - (void)copyTapped:(id)sender {
@@ -324,7 +324,7 @@
 					NSString *base = [name stringByDeletingPathExtension];
 					destination = [directory stringByAppendingPathComponent:
 								   [NSString stringWithFormat:@"%@ (%@).pdf", base,
-									[[NSUUID UUID] UUIDString].substringToIndex(4)]];
+									[[[NSUUID UUID] UUIDString] substringToIndex:4]];
 				}
 				NSError *moveError = nil;
 				if (![fm moveItemAtURL:location toURL:[NSURL fileURLWithPath:destination] error:&moveError]) {
@@ -344,4 +344,5 @@
 }
 
 @end
+
 

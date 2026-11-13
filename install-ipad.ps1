@@ -24,7 +24,8 @@ if ($Pdf -ne "") {
         exit 1
     }
     Write-Host "==> Copiando PDF para Documents do app..."
-    & $Python -m pymobiledevice3 apps push com.lucaspdf.editor $Pdf --documents
+    $name = Split-Path $Pdf -Leaf
+    & $Python -m pymobiledevice3 apps push com.lucaspdf.editor $Pdf "Documents/$name"
 }
 
-Write-Host "==> Concluido. Abra o app 'PDF Editor' no iPad."
+Write-Host "==> Concluido. Abra o app 'PDF LM' no iPad."
