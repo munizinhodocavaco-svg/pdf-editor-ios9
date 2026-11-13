@@ -31,7 +31,10 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 @property (nonatomic, strong) UIButton *prevButton;
 @property (nonatomic, strong) UIButton *nextButton;
 
-@property (nonatomic, strong) NSUndoManager *annotationUndoManager;
+/* Pilha de desfazer propria: o NSUndoManager do iOS 9 lanca excecao
+   ("must begin a group before registering undo") quando groupsByEvent = NO,
+   o que derrubava o app no primeiro traco. */
+@property (nonatomic, strong) NSMutableArray *undoStack;
 @property (nonatomic, strong) UIColor *currentColor;
 @property (nonatomic, assign) EditorTool currentTool;
 
@@ -46,8 +49,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		_currentPage = 1;
 		_currentTool = EditorToolPencil;
 		_currentColor = [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0];
-		_annotationUndoManager = [[NSUndoManager alloc] init];
-		_annotationUndoManager.groupsByEvent = NO;
+		_undoStack = [NSMutableArray array];
 		_store = [[AnnotationStore alloc] initWithPDFURL:pdfURL];
 		_document = CGPDFDocumentCreateWithURL((__bridge CFURLRef)pdfURL);
 		_pageCount = (_document != NULL) ? CGPDFDocumentGetNumberOfPages(_document) : 0;
@@ -236,8 +238,14 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 }
 
 - (void)undoTapped:(id)sender {
-	[self.annotationUndoManager undo];
+	if (self.undoStack.count == 0) {
+		return;
+	}
+	void (^action)(void) = [self.undoStack lastObject];
+	[self.undoStack removeLastObject];
+	action();
 	[self refreshAnnotations];
+	PDFLog(@"Editor: desfazer (%lu restantes)", (unsigned long)self.undoStack.count);
 }
 
 - (void)prevTapped:(id)sender {
@@ -322,10 +330,11 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	[self.store addAnnotation:annotation toPage:page];
 
 	__weak RootViewController *weakSelf = self;
-	[self.annotationUndoManager registerUndoWithTarget:self handler:^(id target) {
+	void (^undoBlock)(void) = ^{
 		[weakSelf.store removeAnnotation:annotation fromPage:page];
 		[weakSelf refreshAnnotations];
-	}];
+	};
+	[self pushUndoBlock:undoBlock];
 }
 
 - (void)pageView:(PDFPageView *)pageView didRemoveAnnotation:(Annotation *)annotation {
@@ -333,10 +342,22 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	[self.store removeAnnotation:annotation fromPage:page];
 
 	__weak RootViewController *weakSelf = self;
-	[self.annotationUndoManager registerUndoWithTarget:self handler:^(id target) {
+	void (^undoBlock)(void) = ^{
 		[weakSelf.store addAnnotation:annotation toPage:page];
 		[weakSelf refreshAnnotations];
-	}];
+	};
+	[self pushUndoBlock:undoBlock];
+}
+
+- (void)pushUndoBlock:(void (^)(void))block {
+	if (block == nil) {
+		return;
+	}
+	[self.undoStack addObject:[block copy]];
+	// Limite de memoria: mantem as ultimas 300 acoes.
+	while (self.undoStack.count > 300) {
+		[self.undoStack removeObjectAtIndex:0];
+	}
 }
 
 #pragma mark - Exportacao
