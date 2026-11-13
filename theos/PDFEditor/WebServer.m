@@ -404,7 +404,7 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 @interface WebServer ()
 @property (nonatomic, assign) int listenFD;
 @property (nonatomic, assign) uint16_t port;
-@property (nonatomic, assign) BOOL running;
+@property (nonatomic, assign, getter=isRunning) BOOL running;
 @property (nonatomic, strong) NSString *lastError;
 @end
 
@@ -485,7 +485,7 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 	self.lastError = nil;
 	PDFLog(@"WebServer: escutando em %@:%u (%@)", [WebServer deviceIPAddress], port, PDFDocumentsDirectory());
 
-	NSThread *thread = [[NSThread alloc] initWithTarget:self selector:@selector(acceptLoop) object:nil];
+	NSThread *thread = [[NSThread alloc] initWithTarget:self selector:@selector(acceptLoop:) object:nil];
 	thread.name = @"PDFLM-WebServer";
 	[thread start];
 	return YES;
@@ -502,7 +502,7 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 	PDFLog(@"WebServer: parado");
 }
 
-- (void)acceptLoop {
+- (void)acceptLoop:(id)ignored {
 	while (self.running) {
 		int client = accept(self.listenFD, NULL, NULL);
 		if (client < 0) {
@@ -709,4 +709,5 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 }
 
 @end
+
 
