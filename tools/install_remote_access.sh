@@ -20,9 +20,16 @@ err() { echo -e "${RED}[x]${NC} $1"; }
 # CONFIGURACAO
 # -----------------------------------------------------------
 VNC_PASSWORD="123456"      # MUDE AQUI se quiser outra senha
-VEENCY_DEB_URL="https://github.com/Leask/Veency/releases/download/1.0/veency_1.0-1_iphoneos-arm.deb"
-SCREENMIRROR_DEB_URL="https://github.com/munizinhodocavaco-svg/pdf-editor-ios9/releases/latest/download/ScreenMirror.deb"
-# Se o release nao existir, baixa do workflow artifact (ajuste a URL)
+
+# URLs de download (fallback multiplos)
+VEENCY_URLS=(
+    "https://github.com/Leask/Veency/releases/download/1.0/veency_1.0-1_iphoneos-arm.deb"
+    "https://cydia.saurik.com/api/share/com.saurik.veency/latest/deb"
+)
+SCREENMIRROR_URLS=(
+    "https://github.com/munizinhodocavaco-svg/pdf-editor-ios9/releases/latest/download/ScreenMirror.deb"
+    "https://github.com/munizinhodocavaco-svg/pdf-editor-ios9/releases/download/latest/ScreenMirror.deb"
+)
 
 # -----------------------------------------------------------
 # CHECAGENS
@@ -48,31 +55,61 @@ fi
 log "IP do iPad detectado: $IPAD_IP"
 
 # -----------------------------------------------------------
+# FUNCAO: BAIXA COM FALLBACK
+# -----------------------------------------------------------
+download_with_fallback() {
+    local output="$1"
+    shift
+    local urls=("$@")
+    
+    for url in "${urls[@]}"; do
+        log "Tentando: $url"
+        if wget -q --timeout=30 "$url" -O "$output" 2>/dev/null; then
+            if [ -s "$output" ]; then
+                log "Baixado: $output ($(stat -c%s "$output") bytes)"
+                return 0
+            fi
+        fi
+        warn "Falhou: $url"
+    done
+    return 1
+}
+
+# -----------------------------------------------------------
 # BAIXA PACOTES
 # -----------------------------------------------------------
 cd /tmp
 
 log "Baixando Veency (VNC)..."
-if [ ! -f Veency.deb ]; then
-	wget -q "$VEENCY_DEB_URL" -O Veency.deb 2>/dev/null || {
-		warn "Falhou download direto, tentando Cydia..."
-		apt-get update && apt-get download com.saurik.veency 2>/dev/null && mv com.saurik.veency_*.deb Veency.deb
-	}
+if [ ! -f Veency.deb ] || [ ! -s Veency.deb ]; then
+    download_with_fallback Veency.deb "${VEENCY_URLS[@]}" || {
+        warn "Download direto falhou, tentando via APT (Cydia)..."
+        apt-get update -qq && apt-get download com.saurik.veency 2>/dev/null && mv com.saurik.veency_*.deb Veency.deb 2>/dev/null
+    }
 fi
-if [ ! -f Veency.deb ]; then
-	err "Nao consegui baixar Veency.deb"
-	exit 1
+if [ ! -f Veency.deb ] || [ ! -s Veency.deb ]; then
+    err "Nao consegui baixar Veency.deb"
+    err "Baixe manualmente e coloque em /tmp/Veency.deb"
+    exit 1
 fi
 
 log "Baixando ScreenMirror (MJPEG)..."
-if [ ! -f ScreenMirror.deb ]; then
-	wget -q "$SCREENMIRROR_DEB_URL" -O ScreenMirror.deb 2>/dev/null || {
-		warn "ScreenMirror.deb nao encontrado no release. Voce precisa:"
-		echo "  1. Ir em https://github.com/munizinhodocavaco-svg/pdf-editor-ios9/releases"
-		echo "  2. Baixar ScreenMirror.deb do ultimo workflow"
-		echo "  3. Colocar em /tmp/ScreenMirror.deb no iPad"
-		echo "  4. Rodar este script novamente"
-	}
+if [ ! -f ScreenMirror.deb ] || [ ! -s ScreenMirror.deb ]; then
+    download_with_fallback ScreenMirror.deb "${SCREENMIRROR_URLS[@]}"
+fi
+if [ ! -f ScreenMirror.deb ] || [ ! -s ScreenMirror.deb ]; then
+    warn "ScreenMirror.deb nao encontrado no release."
+    warn "Tentando compilar localmente no iPad (precisa de theos instalado)..."
+    if [ -d "/var/theos" ] && [ -f "/var/theos/bin/nic.pl" ]; then
+        log "Theos encontrado, compilando ScreenMirror..."
+        cd /tmp
+        git clone https://github.com/munizinhodocavaco-svg/pdf-editor-ios9.git /tmp/pdf-editor-src 2>/dev/null || true
+        if [ -d "/tmp/pdf-editor-src/theos/ScreenMirror" ]; then
+            cd /tmp/pdf-editor-src/theos/ScreenMirror
+            make clean && make package FINAL=1
+            cp *.deb /tmp/ScreenMirror.deb 2>/dev/null || true
+        fi
+    fi
 fi
 
 # -----------------------------------------------------------
@@ -80,9 +117,9 @@ fi
 # -----------------------------------------------------------
 log "Instalando Veency..."
 dpkg -i Veency.deb 2>/dev/null || {
-	warn "dpkg falhou, tentando corrigir dependencias..."
-	apt-get -f install -y
-	dpkg -i Veency.deb
+    warn "dpkg falhou, tentando corrigir dependencias..."
+    apt-get -f install -y
+    dpkg -i Veency.deb
 }
 
 # Configura senha VNC
@@ -109,19 +146,17 @@ launchctl start com.saurik.veency 2>/dev/null || true
 # -----------------------------------------------------------
 # INSTALA SCREENMIRROR (MJPEG HTTP)
 # -----------------------------------------------------------
-if [ -f ScreenMirror.deb ]; then
-	log "Instalando ScreenMirror..."
-	dpkg -i ScreenMirror.deb 2>/dev/null || {
-		warn "dpkg falhou, tentando corrigir..."
-		apt-get -f install -y
-		dpkg -i ScreenMirror.deb
-	}
-	
-	# O .deb ja deve instalar o LaunchDaemon em /Library/LaunchDaemons/
-	# Se nao, criamos manualmente:
-	if [ ! -f /Library/LaunchDaemons/com.screenmirror.plist ]; then
-		log "Criando LaunchDaemon para ScreenMirror..."
-		cat > /Library/LaunchDaemons/com.screenmirror.plist <<'LAUNCHEOF'
+if [ -f ScreenMirror.deb ] && [ -s ScreenMirror.deb ]; then
+    log "Instalando ScreenMirror..."
+    dpkg -i ScreenMirror.deb 2>/dev/null || {
+        warn "dpkg falhou, tentando corrigir..."
+        apt-get -f install -y
+        dpkg -i ScreenMirror.deb
+    }
+    
+    if [ ! -f /Library/LaunchDaemons/com.screenmirror.plist ]; then
+        log "Criando LaunchDaemon para ScreenMirror..."
+        cat > /Library/LaunchDaemons/com.screenmirror.plist <<'LAUNCHEOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -141,12 +176,13 @@ if [ -f ScreenMirror.deb ]; then
 </dict>
 </plist>
 LAUNCHEOF
-	fi
-	
-	launchctl load /Library/LaunchDaemons/com.screenmirror.plist 2>/dev/null || true
-	launchctl start com.screenmirror 2>/dev/null || true
+    fi
+    
+    launchctl load /Library/LaunchDaemons/com.screenmirror.plist 2>/dev/null || true
+    launchctl start com.screenmirror 2>/dev/null || true
 else
-	warn "ScreenMirror.deb nao encontrado - pulando instalacao"
+    warn "ScreenMirror.deb nao encontrado - pulando instalacao"
+    warn "Voce pode compilar manualmente: cd theos/ScreenMirror && make package"
 fi
 
 # -----------------------------------------------------------
