@@ -9,38 +9,49 @@ O SpringBoard guarda a tela de bloqueio em dois arquivos:
 
 | Arquivo | Descrição |
 |---|---|
-| `/var/mobile/Library/SpringBoard/LockBackground.cpbitmap` | a imagem em si (1024×1024 RGBA cru) |
+| `/var/mobile/Library/SpringBoard/LockBackground.cpbitmap` | a imagem em si (1024×1024) |
 | `/var/mobile/Library/SpringBoard/LockBackgroundThumbnail.jpg` | miniatura 116×154 usada no zoom da tela de bloqueio |
 
 Formato do `.cpbitmap` (verificado no aparelho):
 
 ```
 +-----------------------------------------------+  offset 0x000000
-| 1024 x 1024 pixels  RGBA  (4.194.304 bytes)  |  row-major, de cima para baixo
+| 1024 x 1024 pixels  (4.194.304 bytes)        |  row-major, de cima para baixo
+|   ordem dos canais: B G R A                   |  <-- ATENÇÃO (veja abaixo)
 +-----------------------------------------------+  offset 0x400000
 | bplist de 89 bytes com as propriedades do      |  kCGColorSpaceSRGB, 1024x1024
 | CGImage (mesmo do arquivo original)            |
 +-----------------------------------------------+  offset 0x400059
 ```
 
-Como a largura/altura e o espaço de cor não mudam, o bplist do arquivo original
-é reaproveitado e **só os pixels são trocados**.
+### ⚠️ Ordem dos canais: **BGRA**, não RGBA
 
-> O iPad 2 tem tela 4:3 (768×1024). O SpringBoard recorta a imagem quadrada
-> pelo centro, mostrando 768 px de largura. Por isso o script desenha o logo
-> já com 768 px de largura no centro de um canvas 1024×1024.
+O iOS 9 grava os pixels em ordem **Azul, Verde, Vermelho, Alpha**.
+Se escrever em RGRA, a tela de bloqueio aparece com **vermelho e azul trocados**
+(ex.: uma camisa amarela aparece ciano, tons de pele ficam azulados).
+
+Isso foi confirmado decodificando o wallpaper original do iOS 9: lendo como RGRA
+dá uma "flor amarela"; desfazendo a troca (BGRA) dá o wallpaper correto do
+iOS 9 — azul/teal com laranja, idêntico ao `LockBackgroundThumbnail.jpg`.
+
+### ⚠️ Tela 4:3
+
+O iPad 2 tem tela 768×1024 (retrato). O SpringBoard recorta o canvas quadrado
+de 1024×1024 pelo centro, mostrando só **768 px de largura**. Por isso a foto
+é dimensionada para **cobrir 768×1024** (igual o recorte de papel de parede do
+próprio iOS) e colocada nessa faixa central.
 
 ## Uso
 
 ```powershell
-# 1) Gerar os arquivos (precisa do Pillow)
-python tools\make_wallpaper.py
+# 1) Gerar (recebe o caminho da foto; 2º argumento = quanto cortar do topo)
+python tools\make_wallpaper_photo.py "C:\Users\...\foto.jpg" 0.0
 
-# 2) Enviar para o iPad (via SSH/USB)
+# 2) Enviar
 python _ipad2\sh.py --put "$env:TEMP\LockBackground_new.cpbitmap" /tmp/LockBackground.cpbitmap
 python _ipad2\sh.py --put "$env:TEMP\LockBackgroundThumbnail_new.jpg" /tmp/LockBackgroundThumbnail.jpg
 
-# 3) Instalar (com backup) e reiniciar o SpringBoard
+# 3) Instalar (só a tela de bloqueio) e recarregar o SpringBoard
 python _ipad2\sh.py "cp /tmp/LockBackground.cpbitmap /var/mobile/Library/SpringBoard/; \
   cp /tmp/LockBackgroundThumbnail.jpg /var/mobile/Library/SpringBoard/; \
   chown mobile:mobile /var/mobile/Library/SpringBoard/LockBackground*; \
@@ -48,7 +59,7 @@ python _ipad2\sh.py "cp /tmp/LockBackground.cpbitmap /var/mobile/Library/SpringB
   killall SpringBoard"
 ```
 
-O backup do wallpaper original fica em
+O wallpaper original fica salvo em
 `/var/mobile/Library/SpringBoard/_backup_wallpaper/`.
 
 ## Desfazer
@@ -62,6 +73,9 @@ python _ipad2\sh.py "cp /var/mobile/Library/SpringBoard/_backup_wallpaper/LockBa
 
 ## Observações
 
-- A tela inicial (home) usa outro arquivo e **não** é alterada por este script.
-- A imagem é aplicada quando a tela é bloqueada; um `killall SpringBoard`
+- Só a **tela de bloqueio** é alterada. A tela inicial usa outros arquivos
+  (cache `com.apple.springboard.sharedimagecache/Wallpaper/`) e não é tocada.
+- A imagem aparece quando a tela é bloqueada; um `killall SpringBoard`
   (ou reiniciar o iPad) já força a recarga.
+- `tools/getcat.py` baixa arquivos via SSH (funciona com nomes que o SFTP
+  do iOS 9 não consegue ler, como os do cache de wallpaper).
