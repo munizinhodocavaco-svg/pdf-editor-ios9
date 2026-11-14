@@ -101,6 +101,11 @@ Detalhes técnicos:
   requisições uma a uma).
 - Um ponto verde no canto indica que o iPad está respondendo.
 
+> **Nota:** Se o iPad estiver conectado ao PC via USB, ele pode ganhar um IP
+> `192.168.100.x` (tethering USB) que o PC não alcança diretamente. Para testar
+> o controle remoto, conecte ambos no mesmo Wi-Fi ou use o hotspot do celular
+> como rede compartilhada.
+
 ## Importar arquivos (jeito mais fácil)
 
 1. Conecte o iPad e o computador na mesma rede Wi-Fi.
@@ -174,6 +179,33 @@ theos/
   qualquer acesso ao sandbox (e `Documents/launch.log` quando o sandbox permite).
   Se `/tmp/pdfeditor.log` existir, o binário executou; se não existir, o launchd
   barrou o processo antes do `main`.
+
+## Personalizar o wallpaper (tela de bloqueio e tela inicial)
+
+O app inclui ferramentas para aplicar sua foto como wallpaper **com cores corretas**
+no iPad 2 (iOS 9), que usa formato **BGRA** (não RGBA) nos arquivos `.cpbitmap`.
+
+### Gerar os arquivos
+
+```bash
+# No PC (Python + Pillow)
+cd _ipad2
+python make_wallpaper_photo.py foto.jpg
+# Gera: /tmp/LockBackground.cpbitmap (BGRA 768x1024) + Thumbnail
+```
+
+### Instalar no iPad (via SSH/USB)
+
+```bash
+# Envia os arquivos e aplica (reinicia o SpringBoard)
+scp /tmp/LockBackground.cpbitmap /tmp/LockBackgroundThumbnail.jpg root@ipad:/tmp/
+ssh root@ipad 'sh /tmp/install_wallpaper.sh'
+```
+
+O script `tools/install_wallpaper.sh` também **limpa o cache de variantes
+renderizadas** do SpringBoard (`shared-2020...`, `shared-2030...` etc), forçando
+a regeneração a partir do seu `LockBackground.cpbitmap`. Isso evita a faixa
+colorida do wallpaper antigo aparecer na tela inicial (zoom/perspective).
 
 ## Solução de problemas
 
