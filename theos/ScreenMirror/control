@@ -1,0 +1,10 @@
+Package: com.screenmirror
+Name: ScreenMirror
+Version: 1.0
+Architecture: iphoneos-arm
+Description: MJPEG HTTP screen mirror for iOS 9 (port 8081)
+Maintainer: Lucas <lucas@example.com>
+Author: Lucas <lucas@example.com>
+Section: Utilities
+Priority: optional
+Depends: firmware (>= 9.0)
