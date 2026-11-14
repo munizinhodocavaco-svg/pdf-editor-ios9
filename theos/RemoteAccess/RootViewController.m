@@ -16,7 +16,6 @@
 	self.view.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
 	
 	[self setupUI];
-	[self startServers];
 	[self startIPUpdateTimer];
 }
 
@@ -150,32 +149,92 @@
 	_mjpegServer = [[MJPEGServer alloc] initWithPort:8081];
 }
 
+- (void)ensureVNCServer {
+	if (!_vncServer) {
+		@try {
+			_vncServer = [[VNCServer alloc] initWithPort:5900 password:@"123456"];
+		}
+		@catch (NSException *e) {
+			NSLog(@"VNCServer init failed: %@", e);
+			_vncServer = nil;
+		}
+	}
+}
+
+- (void)ensureMJPEGServer {
+	if (!_mjpegServer) {
+		@try {
+			_mjpegServer = [[MJPEGServer alloc] initWithPort:8081];
+		}
+		@catch (NSException *e) {
+			NSLog(@"MJPEGServer init failed: %@", e);
+			_mjpegServer = nil;
+		}
+	}
+}
+
 - (IBAction)vncToggled:(UISwitch *)sender {
+	[self ensureVNCServer];
+	if (!_vncServer) {
+		sender.on = NO;
+		[self updateStatusLabels];
+		return;
+	}
 	if (sender.isOn) {
-		[_vncServer start];
+		@try {
+			[_vncServer start];
+		}
+		@catch (NSException *e) {
+			NSLog(@"VNC start failed: %@", e);
+			sender.on = NO;
+		}
 	} else {
-		[_vncServer stop];
+		@try {
+			[_vncServer stop];
+		}
+		@catch (NSException *e) {
+			NSLog(@"VNC stop failed: %@", e);
+		}
 	}
 	[self updateStatusLabels];
 }
 
 - (IBAction)mjpegToggled:(UISwitch *)sender {
+	[self ensureMJPEGServer];
+	if (!_mjpegServer) {
+		sender.on = NO;
+		[self updateStatusLabels];
+		return;
+	}
 	if (sender.isOn) {
-		[_mjpegServer start];
+		@try {
+			[_mjpegServer start];
+		}
+		@catch (NSException *e) {
+			NSLog(@"MJPEG start failed: %@", e);
+			sender.on = NO;
+		}
 	} else {
-		[_mjpegServer stop];
+		@try {
+			[_mjpegServer stop];
+		}
+		@catch (NSException *e) {
+			NSLog(@"MJPEG stop failed: %@", e);
+		}
 	}
 	[self updateStatusLabels];
 }
 
 - (void)updateStatusLabels {
-	_vncStatusLabel.text = _vncServer.running ? @"Rodando" : @"Parado";
-	_vncStatusLabel.textColor = _vncServer.running ? [UIColor colorWithRed:0.0 green:0.8 blue:0.3 alpha:1.0] : [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0];
-	_vncSwitch.on = _vncServer.running;
+	BOOL vncRunning = _vncServer && _vncServer.running;
+	_vncStatusLabel.text = vncRunning ? @"Rodando" : @"Parado";
+	_vncStatusLabel.textColor = vncRunning ? [UIColor colorWithRed:0.0 green:0.8 blue:0.3 alpha:1.0] : [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0];
+	_vncSwitch.on = vncRunning;
 	
-	_mjpegStatusLabel.text = _mjpegServer.running ? @"Rodando" : @"Parado";
-	_mjpegStatusLabel.textColor = _mjpegServer.running ? [UIColor colorWithRed:0.0 green:0.8 blue:0.3 alpha:1.0] : [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0];
-	_mjpegSwitch.on = _mjpegServer.running;
+	BOOL mjpegRunning = _mjpegServer && _mjpegServer.running;
+	_mjpegStatusLabel.text = mjpegRunning ? @"Rodando" : @"Parado";
+	_mjpegStatusLabel.textColor = mjpegRunning ? [UIColor colorWithRed:0.0 green:0.8 blue:0.3 alpha:1.0] : [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0];
+	_mjpegSwitch.on = mjpegRunning;
 }
 
 - (void)startIPUpdateTimer {
