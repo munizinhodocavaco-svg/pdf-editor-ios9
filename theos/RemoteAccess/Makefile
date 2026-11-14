@@ -6,10 +6,10 @@ include $(THEOS)/makefiles/common.mk
 APPLICATION_NAME = RemoteAccess
 
 RemoteAccess_FILES = main.m \
-	RemoteAccess/AppDelegate.m \
-	RemoteAccess/RootViewController.m \
-	RemoteAccess/VNCServer.m \
-	RemoteAccess/MJPEGServer.m
+	AppDelegate.m \
+	RootViewController.m \
+	VNCServer.m \
+	MJPEGServer.m
 RemoteAccess_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore CoreFoundation
 RemoteAccess_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
 RemoteAccess_LDFLAGS = -Wl,-segalign,4000
