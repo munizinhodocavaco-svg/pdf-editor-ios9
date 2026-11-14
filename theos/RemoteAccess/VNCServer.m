@@ -18,20 +18,17 @@
 #define RFB_POINTER_EVENT 5
 #define RFB_CLIENT_CUT_TEXT 6
 
-// Load UIGetScreenImage at runtime
+// Load UIGetScreenImage at runtime (lazy)
 static CGImageRef (*UIGetScreenImagePtr)(void) = NULL;
 
-static void loadUIGetScreenImage() __attribute__((constructor));
-static void loadUIGetScreenImage() {
+static inline CGImageRef getUIGetScreenImage() {
     if (!UIGetScreenImagePtr) {
         UIGetScreenImagePtr = (CGImageRef (*)(void))dlsym(RTLD_DEFAULT, "UIGetScreenImage");
-        if (!UIGetScreenImagePtr) {
-            NSLog(@"VNC: UIGetScreenImage not available");
-        }
     }
+    return UIGetScreenImagePtr ? UIGetScreenImagePtr() : NULL;
 }
 
-#define UIGetScreenImage() (UIGetScreenImagePtr ? UIGetScreenImagePtr() : NULL)
+#define UIGetScreenImage() getUIGetScreenImage()
 
 @interface VNCServer ()
 @property (nonatomic, assign) int listenFD;

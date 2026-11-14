@@ -11,20 +11,17 @@
 
 #define MJPEG_BOUNDARY "remoteaccess_boundary"
 
-// Load UIGetScreenImage at runtime
+// Load UIGetScreenImage at runtime (lazy)
 static CGImageRef (*UIGetScreenImagePtr)(void) = NULL;
 
-static void loadUIGetScreenImage() __attribute__((constructor));
-static void loadUIGetScreenImage() {
+static inline CGImageRef getUIGetScreenImage() {
     if (!UIGetScreenImagePtr) {
         UIGetScreenImagePtr = (CGImageRef (*)(void))dlsym(RTLD_DEFAULT, "UIGetScreenImage");
-        if (!UIGetScreenImagePtr) {
-            NSLog(@"MJPEG: UIGetScreenImage not available");
-        }
     }
+    return UIGetScreenImagePtr ? UIGetScreenImagePtr() : NULL;
 }
 
-#define UIGetScreenImage() (UIGetScreenImagePtr ? UIGetScreenImagePtr() : NULL)
+#define UIGetScreenImage() getUIGetScreenImage()
 
 @interface MJPEGServer ()
 @property (nonatomic, assign) int listenFD;
