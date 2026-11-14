@@ -43,7 +43,8 @@ cd ../..
 echo "=== Copying artifacts ==="
 mkdir -p artifacts
 cp theos/PDFEditor.ipa artifacts/PDFEditor.ipa 2>/dev/null || true
-cp theos/ScreenMirror_*_iphoneos-arm.deb artifacts/ScreenMirror.deb 2>/dev/null || true
+# ScreenMirror .deb is in theos/ScreenMirror/packages/
+cp theos/ScreenMirror/packages/com.screenmirror_*_iphoneos-arm.deb artifacts/ScreenMirror.deb 2>/dev/null || true
 
 echo "=== Done ==="
 ls -la artifacts/
