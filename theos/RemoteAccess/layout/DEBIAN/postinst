@@ -1,0 +1,12 @@
+#!/bin/bash
+# Post-install script for RemoteAccess
+
+# Refresh icon cache
+uicache -p /Applications/RemoteAccess.app 2>/dev/null || true
+
+# Load LaunchDaemon if exists (optional)
+if [ -f /Library/LaunchDaemons/com.lucas.remoteaccess.plist ]; then
+    launchctl load /Library/LaunchDaemons/com.lucas.remoteaccess.plist 2>/dev/null || true
+fi
+
+exit 0

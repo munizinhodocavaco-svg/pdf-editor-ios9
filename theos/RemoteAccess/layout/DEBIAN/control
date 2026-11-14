@@ -1,0 +1,10 @@
+Package: com.lucas.remoteaccess
+Name: Acesso Remoto LM
+Version: 1.0-1
+Architecture: iphoneos-arm
+Description: App de acesso remoto com VNC (porta 5900) e MJPEG (porta 8081) embutidos. Controle total do iPad 2 via Wi-Fi pelo iPhone 14 Pro Max.
+Maintainer: Lucas Muniz <lucas@example.com>
+Section: Utilities
+Priority: optional
+Depends: firmware (>= 9.0), mobilesubstrate
+Homepage: https://github.com/munizinhodocavaco-svg/pdf-editor-ios9
