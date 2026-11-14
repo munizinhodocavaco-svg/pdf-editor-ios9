@@ -7,6 +7,7 @@
 #import <dispatch/dispatch.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <UIKit/UIKit.h>
+#import <dlfcn.h>
 
 // RFB Protocol constants
 #define RFB_PROTOCOL_VERSION "RFB 003.008\n"
@@ -17,7 +18,19 @@
 #define RFB_POINTER_EVENT 5
 #define RFB_CLIENT_CUT_TEXT 6
 
-extern CGImageRef UIGetScreenImage(void);
+// Load UIGetScreenImage at runtime
+static CGImageRef (*UIGetScreenImagePtr)(void) = NULL;
+
+static void loadUIGetScreenImage() {
+    if (!UIGetScreenImagePtr) {
+        UIGetScreenImagePtr = (CGImageRef (*)(void))dlsym(RTLD_DEFAULT, "UIGetScreenImage");
+        if (!UIGetScreenImagePtr) {
+            NSLog(@"VNC: UIGetScreenImage not available");
+        }
+    }
+}
+
+#define UIGetScreenImage() (UIGetScreenImagePtr ? UIGetScreenImagePtr() : NULL)
 
 @interface VNCServer ()
 @property (nonatomic, assign) int listenFD;

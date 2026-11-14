@@ -7,10 +7,23 @@
 #import <dispatch/dispatch.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <UIKit/UIKit.h>
+#import <dlfcn.h>
 
 #define MJPEG_BOUNDARY "remoteaccess_boundary"
 
-extern CGImageRef UIGetScreenImage(void);
+// Load UIGetScreenImage at runtime
+static CGImageRef (*UIGetScreenImagePtr)(void) = NULL;
+
+static void loadUIGetScreenImage() {
+    if (!UIGetScreenImagePtr) {
+        UIGetScreenImagePtr = (CGImageRef (*)(void))dlsym(RTLD_DEFAULT, "UIGetScreenImage");
+        if (!UIGetScreenImagePtr) {
+            NSLog(@"MJPEG: UIGetScreenImage not available");
+        }
+    }
+}
+
+#define UIGetScreenImage() (UIGetScreenImagePtr ? UIGetScreenImagePtr() : NULL)
 
 @interface MJPEGServer ()
 @property (nonatomic, assign) int listenFD;
