@@ -40,12 +40,41 @@ make clean
 make package FINAL=1
 cd ../..
 
+echo "=== Building RemoteAccess ==="
+cd theos/RemoteAccess
+make clean
+make package FINAL=1
+cd ../..
+
+# Extract .app from .deb and create IPA for RemoteAccess
+DEB_FILE_RA=$(ls theos/RemoteAccess/packages/com.lucas.remoteaccess_*_iphoneos-arm.deb 2>/dev/null | head -1)
+if [ -n "$DEB_FILE_RA" ]; then
+    echo "=== Creating IPA from .deb (RemoteAccess) ==="
+    rm -rf theos/RemoteAccess/build/ipa
+    mkdir -p theos/RemoteAccess/build/ipa/Payload
+    dpkg-deb -x "$DEB_FILE_RA" theos/RemoteAccess/build/ipa
+    if [ -d "theos/RemoteAccess/build/ipa/Applications/RemoteAccess.app" ]; then
+        mv theos/RemoteAccess/build/ipa/Applications/RemoteAccess.app theos/RemoteAccess/build/ipa/Payload/
+        cd theos/RemoteAccess/build/ipa
+        zip -r ../../../../RemoteAccess.ipa Payload
+        cd ../../../..
+        echo "=== Generated: RemoteAccess.ipa ==="
+        ls -la RemoteAccess.ipa
+    else
+        echo "ERROR: RemoteAccess.app not found in .deb"
+    fi
+else
+    echo "ERROR: RemoteAccess .deb file not found"
+fi
+
 echo "=== Copying artifacts ==="
 mkdir -p artifacts
 cp theos/PDFEditor.ipa artifacts/PDFEditor.ipa 2>/dev/null || true
+cp RemoteAccess.ipa artifacts/RemoteAccess.ipa 2>/dev/null || true
 # ScreenMirror .deb is in theos/ScreenMirror/packages/
 cp theos/ScreenMirror/packages/com.screenmirror_*_iphoneos-arm.deb artifacts/ScreenMirror.deb 2>/dev/null || true
 
 echo "=== Done ==="
 ls -la artifacts/
 ls -la theos/PDFEditor.ipa 2>/dev/null || true
+ls -la RemoteAccess.ipa 2>/dev/null || true
