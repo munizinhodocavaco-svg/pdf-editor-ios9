@@ -49,19 +49,27 @@
 	[container addSubview:_ipLabel];
 	
 	// VNC Section
+	UISwitch *vncSwitch = nil;
+	UILabel *vncStatus = nil;
 	UIView *vncSection = [self createServiceSection:@"VNC (Controle Total)" 
 	                                   description:@"Porta 5900 - Use Mocha VNC, RealVNC, etc."
-	                                         switch_:&_vncSwitch
-	                                   statusLabel:&_vncStatusLabel
+	                                             switch_:&vncSwitch
+	                                       statusLabel:&vncStatus
 	                                       action:@selector(vncToggled:)];
+	_vncSwitch = vncSwitch;
+	_vncStatusLabel = vncStatus;
 	[container addSubview:vncSection];
 	
 	// MJPEG Section
+	UISwitch *mjpegSwitch = nil;
+	UILabel *mjpegStatus = nil;
 	UIView *mjpegSection = [self createServiceSection:@"MJPEG (Visualização no Safari)" 
 	                                       description:@"Porta 8081 - Abra http://IP:8081/screen.mjpeg"
-	                                             switch_:&_mjpegSwitch
-	                                       statusLabel:&_mjpegStatusLabel
+	                                             switch_:&mjpegSwitch
+	                                       statusLabel:&mjpegStatus
 	                                           action:@selector(mjpegToggled:)];
+	_mjpegSwitch = mjpegSwitch;
+	_mjpegStatusLabel = mjpegStatus;
 	[container addSubview:mjpegSection];
 	
 	// Instructions

@@ -24,7 +24,7 @@ extern CGImageRef UIGetScreenImage(void);
 @property (nonatomic, strong) dispatch_queue_t acceptQueue;
 @property (nonatomic, strong) dispatch_queue_t clientQueue;
 @property (nonatomic, strong) NSMutableArray *clients;
-@property (nonatomic, assign) BOOL running;
+@property (nonatomic, assign, getter=isRunning, setter=setRunning:) BOOL running;
 @end
 
 @implementation VNCServer
