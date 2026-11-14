@@ -24,7 +24,7 @@ extern CGImageRef UIGetScreenImage(void);
 @property (nonatomic, strong) dispatch_queue_t acceptQueue;
 @property (nonatomic, strong) dispatch_queue_t clientQueue;
 @property (nonatomic, strong) NSMutableArray *clients;
-@property (nonatomic, assign, getter=isRunning, setter=setRunning:) BOOL running;
+@property (nonatomic, assign) BOOL running;
 @end
 
 @implementation VNCServer
@@ -95,6 +95,10 @@ extern CGImageRef UIGetScreenImage(void);
 		[_clients removeAllObjects];
 	});
 	NSLog(@"VNC Server stopped");
+}
+
+- (BOOL)isRunning {
+	return _running;
 }
 
 - (void)acceptLoop {

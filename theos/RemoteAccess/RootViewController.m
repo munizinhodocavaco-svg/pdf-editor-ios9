@@ -138,7 +138,9 @@
 	[section addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-12-[titleLbl]-4-[descLbl]-12-|" options:0 metrics:nil views:views]];
 	[section addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-12-[*switchRef]" options:0 metrics:nil views:views]];
 	[section addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:[*statusRef]-12-|" options:0 metrics:nil views:views]];
-	[section addConstraint:[NSLayoutConstraint constraintWithItem:*switchRef attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:section multiplier:1.0 constant:0]];
+	// Center switch vertically in section using visual format
+	[section addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:[*switchRef(==31)]" options:0 metrics:nil views:views]];
+	[section addConstraint:[NSLayoutConstraint constraintWithItem:*switchRef attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:section attribute:NSLayoutAttributeCenterY multiplier:1.0 constant:0]];
 	
 	return section;
 }
