@@ -5,14 +5,17 @@ iPad 2 (jailbreak). Lê PDFs, permite desenhar com o dedo e salvar o resultado.
 
 ## Recursos
 
-- **Lápis**: desenho livre sobre a página, com 5 cores pré-definidas + espectro de cores completo.
-- **Borracha**: apaga traços tocando neles.
-- **Marcador de texto**: realce semitransparente.
+- **Lápis (✏️)**: desenho livre sobre a página, traço suave com pontas arredondadas.
+- **Borracha (🧽)**: apaga **arrastando** o dedo sobre os traços (sem cursor na tela).
+- **Marcador (🖍️)**: realce semitransparente que cobre a linha de texto (blend *Multiply*).
 - **Tamanhos 1x / 2x / 3x**: cada ferramenta (lápis, borracha, marcador) tem 3 espessuras proporcionais.
+- **Cores**: botões **Preto / Branco / Vermelho** + botão arco-íris para abrir o seletor de espectro (matiz × saturação/brilho).
+- **Modo Eco**: liga/desliga a economia de energia (brilho da tela em 35% + redesenho a 30 FPS).
 - **Desfazer**: pilha própria de desfazer (até 300 ações) — corrige crash do NSUndoManager no iOS 9.
 - **Salvamento automático**: as anotações ficam em `<pdf>.annotations.json`, ao lado do PDF.
-- **Salvar PDF**: gera um PDF achatado em Documentos.
+- **Salvar PDF**: gera um PDF achatado em Documentos — ou substitui o original.
 - **Compartilhar**: envia o PDF anotado pela folha de compartilhamento.
+- **Excluir PDF**: deslize para a esquerda na lista.
 - **Importar por rede**:
   - **Navegador**: servidor HTTP embutido; envie PDFs de qualquer computador na mesma rede Wi-Fi.
   - **WebDAV**: monte a pasta do app como unidade de rede no Windows (`net use Z: http://IP:8080/`).
@@ -20,10 +23,29 @@ iPad 2 (jailbreak). Lê PDFs, permite desenhar com o dedo e salvar o resultado.
 
 ## Interface
 
-- **Barra de ferramentas (topo)**: Lápis / Borracha / Marcador | 1x / 2x / 3x
-- **Cores**: 5 botões de cores rápidas + botão arco-íris para abrir o seletor de espectro (matiz × saturação/brilho).
+- **Barra de ferramentas (topo)**: ✏️ Lápis / 🧽 Borracha / 🖍️ Marcador | 1x / 2x / 3x
+- **Cores**: Preto / Branco / Vermelho + botão arco-íris (seletor HSV) + botão **Eco**
 - **Barra inferior (rodapé)**: Anterior / Página X de Y / Próxima
 - **Lista de documentos**: puxar para recarregar, botão **Importar** abre a tela de rede.
+
+## Economia de bateria (importante no iPad 2)
+
+O iPad 2 tem bateria de 2011, então o app foi feito para pesar pouco:
+
+- **Servidor web lazy**: não sobe junto com o app. Ele só liga quando você abre a
+  tela **Importar** e desliga sozinho quando você sai (se você ligou manualmente
+  com o botão, ele continua). Fica com o socket fechado o resto do tempo, então
+  o rádio Wi-Fi do iPad fica ocioso.
+- **Servidor desligado ao sair do app**: sai para a tela de bloqueio ou troca de
+  app → o servidor para.
+- **Botão Eco**: na tela do editor, toque em **Eco** para:
+  - reduzir o brilho da tela para 35% (o brilho original do sistema é devolvido
+    assim que você desliga o Eco ou sai do app),
+  - limitar o redesenho do traço a 30 FPS (os pontos do toque continuam sendo
+    gravados todos, só o desenho é adiado).
+- **Gravação agrupada**: as anotações são salvas 1,5 s após a última alteração
+  (antes era uma gravação de arquivo por traço). Ao sair da tela do editor ou do
+  app, a gravação é feita na hora — nada se perde.
 
 ## Importar arquivos (jeito mais fácil)
 
@@ -40,7 +62,9 @@ mapear como unidade:
 net use Z: http://192.168.0.12:8080/
 ```
 
-O servidor só funciona enquanto o app está aberto em primeiro plano.
+O servidor só funciona enquanto a tela **Importar** estiver aberta (e o app em
+primeiro plano) — isso economiza bateria. Se quiser deixá-lo ligado o tempo
+todo, toque em **Iniciar servidor** na própria tela.
 
 ### Alternativa por USB
 
