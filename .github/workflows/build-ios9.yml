@@ -1,4 +1,4 @@
-name: Compilar PDF Editor (iOS 9 / armv7)
+name: Compilar PDF Editor + ScreenMirror (iOS 9 / armv7)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build IPA armv7
+    name: Build IPA armv7 + ScreenMirror deb
     runs-on: ubuntu-22.04
 
     steps:
@@ -18,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential fakeroot rsync curl perl zip unzip \
-            git libxml2 libplist-dev libssl-dev pkg-config xz-utils
+            git libxml2 libplist-dev libssl-dev pkg-config xz-utils wget
 
       - name: Instalar Theos
         run: |
@@ -32,12 +32,8 @@ jobs:
           cd /tmp/theos-sdks
           git sparse-checkout set iPhoneOS9.3.sdk
           cp -R iPhoneOS9.3.sdk "$THEOS/sdks/"
-          # O SDK 9.3 de theos/sdks nao traz liblaunch.tbd, embora libSystem.B.tbd
-          # o re-exporte. Sem esse stub o ld falha com:
-          #   ld: file not found: /usr/lib/system/liblaunch.dylib for architecture armv7
           curl -fsSL https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS10.3.sdk/usr/lib/system/liblaunch.tbd \
             -o "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd"
-          # O SDK 9.3 tambem nao traz libsystem_c.tbd (onde memcpy vive), entao copiamos do 10.3.
           curl -fsSL https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS10.3.sdk/usr/lib/system/libsystem_c.tbd \
             -o "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/libsystem_c.tbd"
           test -s "$THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd"
@@ -50,18 +46,28 @@ jobs:
           make -C /tmp/ldid
           sudo cp /tmp/ldid/ldid /usr/local/bin/ldid
 
-      - name: Compilar e empacotar IPA
+      - name: Compilar PDFEditor + ScreenMirror
         run: |
           export THEOS="$HOME/theos"
           chmod +x theos/build.sh
           ./theos/build.sh
 
+      - name: Baixar Veency para iOS 9 armv7
+        run: |
+          mkdir -p artifacts
+          # Veency do saurik (Cydia) - versao que roda no iOS 9
+          wget -q "https://github.com/Leask/Veency/releases/download/1.0/veency_1.0-1_iphoneos-arm.deb" \
+            -O artifacts/Veency.deb || \
+          wget -q "https://cydia.saurik.com/api/share/com.saurik.veency/latest/deb" \
+            -O artifacts/Veency.deb || \
+          echo "Veency download falhou - sera baixado no script de instalacao"
+
       - name: Verificar IPA
         run: python3 verify-ipa.py theos/PDFEditor.ipa
 
-      - name: Publicar artefato
+      - name: Publicar artefatos
         uses: actions/upload-artifact@v4
         with:
-          name: PDFEditor-iOS9-armv7
-          path: theos/PDFEditor.ipa
+          name: RemoteAccess-iOS9-armv7
+          path: artifacts/*
           if-no-files-found: error
