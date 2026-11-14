@@ -144,14 +144,10 @@ void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRec
 
 			CGFloat ux = dx / len;
 			CGFloat uy = dy / len;
-			// Perpendicular (largura do marcador)
+			// Perpendicular horizontal (largura do marcador)
 			CGFloat px = -uy * halfMarkerW;
 			CGFloat py = ux * halfMarkerW;
-			// Vetor para baixo (altura do marcador)
-			CGFloat dx_down = ux * highlighterHeight;
-			CGFloat dy_down = uy * highlighterHeight;
-			// Correção: para baixo na view é +Y, então usamos perpendicular rotacionado
-			// Perpendicular apontando para baixo (+Y na view)
+			// Vetor para baixo (altura do marcador) - perpendicular rotacionado 90°
 			CGFloat down_x = -uy * highlighterHeight;
 			CGFloat down_y = ux * highlighterHeight;
 
