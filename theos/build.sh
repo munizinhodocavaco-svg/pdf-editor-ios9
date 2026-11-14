@@ -5,10 +5,10 @@ export THEOS="$HOME/theos"
 export PATH="$THEOS/bin:$PATH"
 
 echo "=== Building PDFEditor ==="
-cd theos/PDFEditor
+cd theos
 make clean
 make package FINAL=1
-cd ../..
+cd ..
 
 echo "=== Building ScreenMirror ==="
 cd theos/ScreenMirror
