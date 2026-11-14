@@ -21,6 +21,7 @@
 // Load UIGetScreenImage at runtime
 static CGImageRef (*UIGetScreenImagePtr)(void) = NULL;
 
+static void loadUIGetScreenImage() __attribute__((constructor));
 static void loadUIGetScreenImage() {
     if (!UIGetScreenImagePtr) {
         UIGetScreenImagePtr = (CGImageRef (*)(void))dlsym(RTLD_DEFAULT, "UIGetScreenImage");
