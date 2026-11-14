@@ -7,15 +7,17 @@ Formato do .cpbitmap (verificado no aparelho):
 O bplist e reaproveitado do arquivo original (mesma largura/altura/colorspace),
 apenas os pixels sao trocados.
 
-Composicao (tela do iPad 2 = 768x1024, 4:3 retrato):
-    O SpringBoard recorta a imagem quadrada pelo centro, mostrando 768 px de
-    largura. Entao o canvas 1024x1024 e preenchido com um fundo gradiente e a
-    arte e colocada INTEIRA (sem corte) na faixa central visivel de 768x1024.
+Composicao (a foto entra DO JEITO QUE FOI ENVIADA):
+    - A foto NAO e cortada: entra inteira na faixa visivel de 768x1024.
+    - O fundo do canvas e a propria cor de fundo da foto, entao a tela fica
+      100% preenchida de forma continua, sem faixas e sem tarjas.
+    - Nenhuma cor, filtro, sombra ou distorcao e aplicada.
 """
 import os
-from PIL import Image, ImageDraw, ImageFilter
+import sys
+from PIL import Image
 
-SRC = r"C:\Users\Lucas Muniz\Downloads\LOGO LM 22.png"
+SRC = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\Lucas Muniz\Downloads\PERFIL.png"
 ORIG_CPBITMAP = r"C:\Users\Lucas Muniz\AppData\Local\Temp\LockBackground.cpbitmap"
 OUT_CPBITMAP = r"C:\Users\Lucas Muniz\AppData\Local\Temp\LockBackground_new.cpbitmap"
 OUT_THUMB = r"C:\Users\Lucas Muniz\AppData\Local\Temp\LockBackgroundThumbnail_new.jpg"
@@ -25,19 +27,6 @@ SIZE = 1024          # lado do arquivo .cpbitmap
 VISIBLE_W = 768      # largura realmente visivel na tela 4:3 do iPad 2
 THUMB = (116, 154)  # tamanho do thumbnail existente
 
-# Cores da identidade (teal -> verde) usadas no fundo
-TEAL = (67, 159, 183)
-GREEN = (56, 202, 121)
-
-
-def lerp(a, b, t):
-    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
-
-
-def make_background(w, h):
-    """Fundo branco puro: mantem as cores originais da foto."""
-    return Image.new("RGB", (w, h), (255, 255, 255))
-
 
 def main():
     original = open(ORIG_CPBITMAP, "rb").read()
@@ -45,21 +34,24 @@ def main():
     assert len(tail) == 89, f"trailer inesperado: {len(tail)}"
     assert tail.startswith(b"bplist00"), "trailer nao e bplist"
 
-    logo = Image.open(SRC).convert("RGBA")
+    src = Image.open(SRC).convert("RGBA")
 
-    # --- fundo do canvas inteiro (1024x1024) ---
-    canvas = make_background(SIZE, SIZE).convert("RGBA")
+    # cor de fundo da propria foto (canto superior esquerdo)
+    bg = src.getpixel((0, 0))
 
-    # --- arte: cabe inteira na faixa visivel, tocando as laterais ---
-    art_w = VISIBLE_W
-    art_h = round(logo.height * art_w / logo.width)
-    art = logo.resize((art_w, art_h), Image.LANCZOS)
+    # --- a foto inteira, cabendo na faixa visivel de 768x1024 ---
+    scale = min(VISIBLE_W / src.width, SIZE / src.height)
+    art_w = round(src.width * scale)
+    art_h = round(src.height * scale)
+    art = src.resize((art_w, art_h), Image.LANCZOS)
 
-    # posicao: centralizada na area visivel (768 de largura no canvas de 1024)
-    x0 = (SIZE - VISIBLE_W) // 2          # = 128
-    art_x = x0
-    art_y = (SIZE - art_h) // 2           # centralizado verticalmente
+    # --- canvas 1024x1024 com a cor de fundo da foto ---
+    canvas = Image.new("RGBA", (SIZE, SIZE), bg)
 
+    # centralizado na area visivel (a faixa visivel e o centro de 768 px)
+    x0 = (SIZE - VISIBLE_W) // 2
+    art_x = x0 + (VISIBLE_W - art_w) // 2
+    art_y = (SIZE - art_h) // 2
     canvas.alpha_composite(art, (art_x, art_y))
 
     # preview = exatamente o que aparece na tela (recorte central 768x1024)
@@ -76,7 +68,8 @@ def main():
     crop = canvas.convert("RGB").crop((x0, 0, x0 + VISIBLE_W, SIZE))
     crop.resize(THUMB, Image.LANCZOS).save(OUT_THUMB, "JPEG", quality=92)
 
-    print("arte dentro da tela visivel:", art.size, "em", (art_x, art_y))
+    print("fonte:", os.path.basename(SRC), src.size, "-> arte", art.size, "em", (art_x, art_y))
+    print("fundo:", bg)
     print("cpbitmap:", os.path.getsize(OUT_CPBITMAP), "bytes")
     print("thumbnail:", os.path.getsize(OUT_THUMB), "bytes")
     print("preview:", OUT_PREVIEW)
