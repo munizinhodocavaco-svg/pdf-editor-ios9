@@ -21,12 +21,12 @@
 	[self.window makeKeyAndVisible];
 	PDFLog(@"AppDelegate: janela visivel");
 
-	/* ECONOMIA DE ENERGIA: o servidor web NAO sobe junto com o app.
-	   Ele so e ligado quando o usuario abre a tela "Importar" (e desligado
-	   ao sair dela, a menos que o usuario tenha ligado manualmente).
-	   Mantendo o socket fechado o resto do tempo, o radio Wi-Fi do iPad 2
-	   fica ocioso e a bateria dura muito mais. */
-	PDFLog(@"AppDelegate: servidor web em espera (sobe na tela Importar)");
+	/* Servidor de rede no ar o tempo todo em que o app esta aberto:
+	   e por ele que o celular (iPhone) controla o editor e envia arquivos.
+	   Ele desliga sozinho quando o app vai para o segundo plano. */
+	WebServer *server = [WebServer sharedServer];
+	BOOL started = [server startOnPort:8080];
+	PDFLog(@"AppDelegate: servidor web %@ (erro=%@)", started ? @"ativo" : @"falhou", server.lastError);
 
 	return YES;
 }
@@ -34,12 +34,13 @@
 - (void)applicationDidBecomeActive:(UIApplication *)application {
 	/* Volta do segundo plano: reaplica o brilho do modo Eco. */
 	[[Power shared] resumeFromBackground];
+	[[WebServer sharedServer] startOnPort:8080];
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application {
 	/* Sai do app: devolve o brilho ao sistema.
 	   O servidor web NAO e parado aqui: o controle remoto pelo celular
-   precisa continuar funcionando enquanto o app esta em primeiro plano. */
+	   precisa continuar funcionando enquanto o app esta em primeiro plano. */
 	[[Power shared] suspendForBackground];
 	PDFLog(@"AppDelegate: app inativo");
 }
