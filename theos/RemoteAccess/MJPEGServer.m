@@ -15,7 +15,6 @@ extern CGImageRef UIGetScreenImage(void);
 @interface MJPEGServer ()
 @property (nonatomic, assign) int listenFD;
 @property (nonatomic, strong) dispatch_queue_t acceptQueue;
-@property (nonatomic, assign) BOOL running;
 @end
 
 @implementation MJPEGServer
