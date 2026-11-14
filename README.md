@@ -62,9 +62,59 @@ mapear como unidade:
 net use Z: http://192.168.0.12:8080/
 ```
 
-O servidor só funciona enquanto a tela **Importar** estiver aberta (e o app em
-primeiro plano) — isso economiza bateria. Se quiser deixá-lo ligado o tempo
-todo, toque em **Iniciar servidor** na própria tela.
+O servidor fica no ar enquanto o app estiver aberto em primeiro plano (ele desliga
+sozinho quando o app vai para o segundo plano, economizando bateria).
+
+## Controle remoto pelo iPhone (ou qualquer celular)
+
+O mesmo servidor HTTP do app também serve um **controle remoto completo** do
+editor. Assim dá para desenhar no PDF pelo celular, com o iPad apoiado na mesa.
+
+1. iPad e celular na **mesma rede Wi-Fi**.
+2. Abra o **Leitor / Editor Pdf LM** no iPad e **abra um PDF**.
+3. No celular, abra no Safari o endereço do iPad: `http://IP_DO_IPAD:8080/remote`
+   (o mesmo que aparece na tela **Importar**).
+4. No Safari do iPhone, toque em **Compartilhar → Adicionar à Tela de Início**:
+   ele vira um app de tela cheia, muito mais confortável.
+
+O que dá para fazer pelo celular:
+
+| Controle | O que faz |
+|---|---|
+| Tela do PDF | Toque/arraste na imagem para **desenhar** (lápis, marcador ou borracha) |
+| ✏️ 🧽 🖍️ | Troca a ferramenta |
+| 1x / 2x / 3x | Troca o tamanho do traço |
+| ● ● ● | Cores: **preto**, **branco**, **vermelho** |
+| 🎨 | Alterna as cores |
+| ↶ Desfazer | Desfaz o último traço |
+| 💾 Salvar | Salva o PDF (cópia ou original, conforme o botão no iPad) |
+| ♻️ Original | Liga/desliga "substituir o arquivo original" |
+| ‹ › | Página anterior / próxima |
+
+Detalhes técnicos:
+
+- A tela do iPad é enviada como **JPEG** (~1,4 s de intervalo) e os toques do
+  celular são injetados no `PDFPageView` como toques reais.
+- As coordenadas são mapeadas pelo tamanho real da imagem, então o traço sai
+  exatamente onde você tocou.
+- Os toques são limitados a ~25/s porque o iPad 2 é lento (o servidor atende as
+  requisições uma a uma).
+- Um ponto verde no canto indica que o iPad está respondendo.
+
+## Importar arquivos (jeito mais fácil)
+
+1. Conecte o iPad e o computador na mesma rede Wi-Fi.
+2. Abra o **Leitor / Editor Pdf LM** e toque em **Importar** (canto superior esquerdo).
+3. O app mostra um endereço, por exemplo `http://192.168.0.12:8080`.
+4. No computador, abra esse endereço no navegador e envie os PDFs.
+5. Os arquivos aparecem na lista na hora. Toque em **Recarregar** se necessário.
+
+No Windows também é possível abrir o endereço no **Explorador de Arquivos** ou
+mapear como unidade:
+
+```
+net use Z: http://192.168.0.12:8080/
+```
 
 ### Alternativa por USB
 
