@@ -97,10 +97,6 @@ extern CGImageRef UIGetScreenImage(void);
 	NSLog(@"VNC Server stopped");
 }
 
-- (BOOL)isRunning {
-	return _running;
-}
-
 - (void)acceptLoop {
 	while (_running) {
 		struct sockaddr_in clientAddr;

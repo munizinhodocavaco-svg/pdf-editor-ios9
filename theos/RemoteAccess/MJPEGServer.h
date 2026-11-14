@@ -3,7 +3,7 @@
 @interface MJPEGServer : NSObject
 
 @property (nonatomic, assign) uint16_t port;
-@property (nonatomic, assign, getter=isRunning) BOOL running;
+@property (nonatomic, assign) BOOL running;
 
 - (instancetype)initWithPort:(uint16_t)port;
 - (void)start;
