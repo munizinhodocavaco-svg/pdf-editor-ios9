@@ -35,31 +35,8 @@ def lerp(a, b, t):
 
 
 def make_background(w, h):
-    """Fundo com gradiente diagonal suave + brilho radial no centro."""
-    base = Image.new("RGB", (w, h), (255, 255, 255))
-    px = base.load()
-    # gradiente diagonal: teal no topo-esquerda -> verde embaixo-direita
-    step = max(w, h) // 2
-    for y in range(h):
-        for x in range(0, w, 4):
-            t = (x / w * 0.45 + y / h * 0.55)
-            c = lerp(TEAL, GREEN, t)
-            # mistura suave com o branco (8% a 17%) para o fundo preencher a tela toda
-            k = 0.08 + 0.09 * t
-            cc = tuple(int(round(255 + (c[i] - 255) * k)) for i in range(3))
-            for k2 in range(4):
-                if x + k2 < w:
-                    px[x + k2, y] = cc
-
-    # brilho radial suave (luz) atras da arte
-    glow = Image.new("L", (w, h), 0)
-    d = ImageDraw.Draw(glow)
-    r = int(w * 0.55)
-    d.ellipse([w // 2 - r, h // 2 - r, w // 2 + r, h // 2 + r], fill=40)
-    glow = glow.filter(ImageFilter.GaussianBlur(r // 3))
-    light = Image.new("RGB", (w, h), (255, 255, 255))
-    base = Image.composite(light, base, glow)
-    return base
+    """Fundo branco puro: mantem as cores originais da foto."""
+    return Image.new("RGB", (w, h), (255, 255, 255))
 
 
 def main():
@@ -78,18 +55,11 @@ def main():
     art_h = round(logo.height * art_w / logo.width)
     art = logo.resize((art_w, art_h), Image.LANCZOS)
 
-    # sombra bem suave, seguindo a silhueta da arte, para dar profundidade
-    alpha = art.getchannel("A")
-    shadow = Image.new("RGBA", (art_w + 80, art_h + 80), (0, 0, 0, 0))
-    shadow.paste(Image.new("RGBA", art.size, (31, 58, 70, 55)), (40, 40), alpha)
-    shadow = shadow.filter(ImageFilter.GaussianBlur(16))
-
     # posicao: centralizada na area visivel (768 de largura no canvas de 1024)
     x0 = (SIZE - VISIBLE_W) // 2          # = 128
     art_x = x0
     art_y = (SIZE - art_h) // 2           # centralizado verticalmente
 
-    canvas.alpha_composite(shadow, (art_x - 40, art_y - 40))
     canvas.alpha_composite(art, (art_x, art_y))
 
     # preview = exatamente o que aparece na tela (recorte central 768x1024)
