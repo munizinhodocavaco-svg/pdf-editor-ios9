@@ -1,0 +1,8 @@
+#!/bin/bash
+# Pre-remove script for ScreenMirror
+
+launchctl stop com.screenmirror 2>/dev/null || true
+launchctl unload /Library/LaunchDaemons/com.screenmirror.plist 2>/dev/null || true
+rm -f /Library/LaunchDaemons/com.screenmirror.plist
+
+exit 0

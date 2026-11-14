@@ -1,0 +1,30 @@
+#!/bin/bash
+# Post-install script for ScreenMirror
+
+# Create LaunchDaemon
+cat > /Library/LaunchDaemons/com.screenmirror.plist <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.screenmirror</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/ScreenMirror</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>UserName</key>
+	<string>mobile</string>
+</dict>
+</plist>
+EOF
+
+# Load and start
+launchctl load /Library/LaunchDaemons/com.screenmirror.plist 2>/dev/null || true
+launchctl start com.screenmirror 2>/dev/null || true
+
+exit 0
