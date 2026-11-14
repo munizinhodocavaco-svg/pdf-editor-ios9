@@ -69,6 +69,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 }
 
 - (void)dealloc {
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	if (_document != NULL) {
 		CGPDFDocumentRelease(_document);
 		_document = NULL;
@@ -110,10 +111,6 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	} else {
 		[self showPage:1];
 	}
-}
-
-- (void)dealloc {
-	[[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -349,7 +346,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		? [UIColor colorWithRed:0.15 green:0.55 blue:0.15 alpha:1.0].CGColor
 		: [UIColor colorWithWhite:0.70 alpha:1.0].CGColor);
 	self.ecoButton.backgroundColor = (eco
-		? [UIColor colorWithRed:0.88 green:0.97 green:0.88 alpha:1.0]
+		? [UIColor colorWithRed:0.88 green:0.97 blue:0.88 alpha:1.0]
 		: [UIColor colorWithWhite:0.97 alpha:1.0]);
 
 	PDFLog(@"Editor: modo ECO %@", eco ? @"LIGADO" : @"desligado");
