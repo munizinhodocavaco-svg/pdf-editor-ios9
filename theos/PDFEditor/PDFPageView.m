@@ -1,5 +1,6 @@
 #import "PDFPageView.h"
 #import <math.h>
+#import <QuartzCore/QuartzCore.h>
 
 @interface PDFPageView () {
 	/* Pagina PDF renderizada uma unica vez por tamanho de tela. Sem isso o
@@ -15,6 +16,10 @@
 @property (nonatomic, strong) Annotation *currentAnnotation;
 @property (nonatomic, assign) CGPoint lastPoint;
 @property (nonatomic, strong) NSArray *sortedAnnotations;
+
+/* Controle do throttle (modo Eco): limita o redesenho a 30 FPS. */
+@property (nonatomic, assign) NSTimeInterval lastDrawTimestamp;
+@property (nonatomic, assign) CGRect pendingDirtyRect;
 
 - (void)invalidatePageImage;
 - (void)invalidateCompositeImage;
@@ -334,9 +339,31 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		[self.currentAnnotation addPoint:[self normalizedPoint:point inRect:display]];
 	}
 
-	if (!CGRectIsNull(dirty)) {
-		[self setNeedsDisplayInRect:dirty];
+	if (CGRectIsNull(dirty)) {
+		return;
 	}
+
+	/* MODO ECO: limita o redesenho a 30 FPS. Todos os pontos continuam sendo
+	   gravados no traco, apenas o desenho e adiado (o proximo quadro mostra
+	   o traço completo ate ali). Reduz o consumo de CPU/GPU no iPad 2. */
+	if (self.throttleEnabled) {
+		NSTimeInterval now = CACurrentMediaTime();
+		if (now - self.lastDrawTimestamp < (1.0 / 30.0)) {
+			// Ainda dentro do intervalo: guarda a area suja para o proximo quadro.
+			self.pendingDirtyRect = CGRectIsNull(self.pendingDirtyRect)
+				? dirty
+				: CGRectUnion(self.pendingDirtyRect, dirty);
+			return;
+		}
+		self.lastDrawTimestamp = now;
+	}
+
+	if (!CGRectIsNull(self.pendingDirtyRect)) {
+		dirty = CGRectUnion(dirty, self.pendingDirtyRect);
+		self.pendingDirtyRect = CGRectNull;
+	}
+
+	[self setNeedsDisplayInRect:dirty];
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -354,11 +381,14 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		[self.delegate pageView:self didAddAnnotation:finished];
 	}
 
+	/* Garante que a ultima parte do traco (adiada pelo throttle) apareca. */
+	self.pendingDirtyRect = CGRectNull;
 	[self setNeedsDisplay];
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
 	self.currentAnnotation = nil;
+	self.pendingDirtyRect = CGRectNull;
 	[self setNeedsDisplay];
 }
 

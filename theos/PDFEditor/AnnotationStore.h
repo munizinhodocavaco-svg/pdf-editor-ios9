@@ -14,6 +14,8 @@
 - (void)addAnnotation:(Annotation *)annotation toPage:(NSUInteger)page;
 - (void)removeAnnotation:(Annotation *)annotation fromPage:(NSUInteger)page;
 - (void)save;
+/* Grava na hora (sem esperar o agrupamento). Usado ao sair do app. */
+- (void)flushNow;
 - (void)load;
 
 @end

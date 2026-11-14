@@ -30,4 +30,10 @@ typedef NS_ENUM(NSInteger, EditorTool) {
 @property (nonatomic, strong) NSArray *annotations;
 @property (nonatomic, weak) id<PDFPageViewDelegate> delegate;
 
+/* Quando YES, o redesenho do traço e limitado a 30 FPS.
+   Reduz bastante o consumo de CPU/GPU no iPad 2 sem perder suavidade.
+   Os pontos do toque continuam sendo gravados todos, apenas o desenho
+   acontece no maximo 30 vezes por segundo. */
+@property (nonatomic, assign) BOOL throttleEnabled;
+
 @end

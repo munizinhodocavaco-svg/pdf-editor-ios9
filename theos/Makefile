@@ -16,6 +16,7 @@ PDFEditor_FILES = PDFEditor/main.m \
 	PDFEditor/AnnotationStore.m \
 	PDFEditor/WebServer.m \
 	PDFEditor/ColorPickerViewController.m \
+	PDFEditor/Power.m \
 	PDFEditor/Log.m
 PDFEditor_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
 PDFEditor_CFLAGS = -fobjc-arc -Wno-deprecated-declarations

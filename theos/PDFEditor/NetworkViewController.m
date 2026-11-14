@@ -12,6 +12,9 @@
 @property (nonatomic, strong) UIButton *downloadButton;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, assign) BOOL downloadedSomething;
+/* YES se o servidor ja estava ligado antes de abrir esta tela.
+   Se nao estava, ele e desligado ao sair (economia de energia). */
+@property (nonatomic, assign) BOOL serverWasRunningBefore;
 
 @end
 
@@ -38,6 +41,10 @@
 
 - (void)viewWillAppear:(BOOL)animated {
 	[super viewWillAppear:animated];
+	/* O servidor sobe aqui (e nao no inicio do app) para economizar energia.
+	   Guarda se ele ja estava ligado antes: se o usuario tinha ligado
+	   manualmente, continua ligado depois de fechar esta tela. */
+	self.serverWasRunningBefore = [WebServer sharedServer].isRunning;
 	[[WebServer sharedServer] startOnPort:8080];
 	[self updateState];
 }
@@ -47,6 +54,12 @@
 	if (self.downloadedSomething) {
 		[[NSNotificationCenter defaultCenter] postNotificationName:WebServerFilesDidChangeNotification
 															object:nil];
+	}
+	/* Se o servidor foi ligado automaticamente por esta tela, desliga agora
+	   para o radio Wi-Fi do iPad ficar ocioso o resto do tempo. */
+	if (!self.serverWasRunningBefore && [WebServer sharedServer].isRunning) {
+		[[WebServer sharedServer] stop];
+		PDFLog(@"Rede: servidor desligado ao sair da tela Importar");
 	}
 }
 
@@ -62,7 +75,10 @@
 		 "2. No navegador do computador, abra o endereco abaixo.\n"
 		 "3. Escolha os PDFs e toque em \"Enviar para o iPad\".\n\n"
 		 "Enquanto esta tela estiver aberta (ou o app estiver em primeiro plano), "
-		 "o servidor fica ativo. Os arquivos recebidos aparecem na lista na hora."
+		 "o servidor fica ativo. Os arquivos recebidos aparecem na lista na hora.\n\n"
+		 "Para economizar bateria, o servidor desliga sozinho quando voce sai "
+		 "desta tela. Se quiser que ele continue ligado, toque em \"Iniciar "
+		 "servidor\" antes de sair."
 								font:[UIFont systemFontOfSize:15]
 							   color:[UIColor darkGrayColor]];
 	steps.tag = 101;

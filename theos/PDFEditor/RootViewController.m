@@ -2,6 +2,7 @@
 #import "PDFPageView.h"
 #import "AnnotationStore.h"
 #import "ColorPickerViewController.h"
+#import "Power.h"
 #import "Log.h"
 
 static CGRect PageBoxRectForPage(CGPDFPageRef page) {
@@ -34,6 +35,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 @property (nonatomic, strong) UIButton *replaceButton;
 @property (nonatomic, strong) UIButton *prevButton;
 @property (nonatomic, strong) UIButton *nextButton;
+@property (nonatomic, strong) UIButton *ecoButton;
 
 @property (nonatomic, assign) BOOL replaceOriginal;
 
@@ -90,6 +92,13 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	[self applyStrokeSettings];
 	[self.view addSubview:self.pageView];
 
+	/* Fica de olho no modo Eco (pode ser ligado/desligado em outro ponto). */
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(powerModeChanged:)
+												 name:PowerModeDidChangeNotification
+											   object:nil];
+	[self applyPowerMode];
+
 	if (self.pageCount == 0) {
 		UILabel *error = [[UILabel alloc] initWithFrame:CGRectZero];
 		error.text = @"Nao foi possivel abrir este PDF.";
@@ -101,6 +110,10 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	} else {
 		[self showPage:1];
 	}
+}
+
+- (void)dealloc {
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -125,6 +138,9 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 		colorX += 36.0;
 	}
 	self.spectrumButton.frame = CGRectMake(colorX, row2 + 1.0, 30, 30);
+
+	// Botão de economia de energia (modo Eco)
+	self.ecoButton.frame = CGRectMake(colorX + 38.0, row2 + 1.0, 66, 30);
 
 	CGFloat right = width - 8.0;
 	self.shareButton.frame = CGRectMake(right - 90.0, row2, 90, 32);
@@ -151,6 +167,13 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 }
 
 #pragma mark - Interface
+
+- (void)viewWillDisappear:(BOOL)animated {
+	[super viewWillDisappear:animated];
+	/* Garante que as anotacoes fiquem salvas antes de sair da tela
+	   (a gravacao normal e agrupada para economizar energia). */
+	[self.store flushNow];
+}
 
 - (UIButton *)makeButton:(NSString *)title action:(SEL)action {
 	UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -211,6 +234,17 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 				  forControlEvents:UIControlEventTouchUpInside];
 	[self.toolbar addSubview:self.spectrumButton];
 	[self updateColorSelection];
+
+	/* Botão do modo Eco: liga/desliga o economy de energia. */
+	self.ecoButton = [UIButton buttonWithType:UIButtonTypeSystem];
+	[self.ecoButton setTitle:@"Eco" forState:UIControlStateNormal];
+	self.ecoButton.titleLabel.font = [UIFont systemFontOfSize:14.0];
+	self.ecoButton.backgroundColor = [UIColor colorWithWhite:0.97 alpha:1.0];
+	self.ecoButton.layer.cornerRadius = 5.0;
+	self.ecoButton.layer.borderWidth = 1.0;
+	self.ecoButton.layer.borderColor = [UIColor colorWithWhite:0.70 alpha:1.0].CGColor;
+	[self.ecoButton addTarget:self action:@selector(ecoTapped:) forControlEvents:UIControlEventTouchUpInside];
+	[self.toolbar addSubview:self.ecoButton];
 
 	self.undoButton = [self makeButton:@"Desfazer" action:@selector(undoTapped:)];
 	self.saveButton = [self makeButton:@"Salvar PDF" action:@selector(saveTapped:)];
@@ -286,6 +320,39 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	self.pageView.tool = self.currentTool;
 	self.pageView.strokeWidth = base * scale;
 	self.pageView.eraserWidth = 12.0 * scale;
+}
+
+#pragma mark - Modo Eco (economia de energia)
+
+- (void)ecoTapped:(id)sender {
+	Power *power = [Power shared];
+	[power setEcoMode:!power.ecoMode];
+	[self applyPowerMode];
+}
+
+- (void)powerModeChanged:(NSNotification *)notification {
+	[self applyPowerMode];
+}
+
+/* Aplica o estado do modo Eco: brilho (feito pelo Power) + throttle do redesenho. */
+- (void)applyPowerMode {
+	Power *power = [Power shared];
+	BOOL eco = power.ecoMode;
+
+	self.pageView.throttleEnabled = power.throttleDrawing;
+
+	[self.ecoButton setTitle:(eco ? @"Eco ✓" : @"Eco") forState:UIControlStateNormal];
+	[self.ecoButton setTitleColor:(eco ? [UIColor colorWithRed:0.15 green:0.55 blue:0.15 alpha:1.0]
+									  : [UIColor darkGrayColor])
+						forState:UIControlStateNormal];
+	self.ecoButton.layer.borderColor = (eco
+		? [UIColor colorWithRed:0.15 green:0.55 blue:0.15 alpha:1.0].CGColor
+		: [UIColor colorWithWhite:0.70 alpha:1.0].CGColor);
+	self.ecoButton.backgroundColor = (eco
+		? [UIColor colorWithRed:0.88 green:0.97 green:0.88 alpha:1.0]
+		: [UIColor colorWithWhite:0.97 alpha:1.0]);
+
+	PDFLog(@"Editor: modo ECO %@", eco ? @"LIGADO" : @"desligado");
 }
 
 - (void)colorTapped:(UIButton *)sender {
