@@ -1,4 +1,5 @@
 ﻿#import "WebServer.h"
+#import "RemoteControl.h"
 #import "Log.h"
 
 #import <sys/socket.h>
@@ -401,6 +402,45 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 
 #pragma mark - Servidor
 
+/* Le um valor numerico da query string (?w=640). */
+static double queryValue(NSString *query, NSString *key) {
+	for (NSString *pair in [query componentsSeparatedByString:@"&"]) {
+		NSArray *parts = [pair componentsSeparatedByString:@"="];
+		if (parts.count == 0) {
+			continue;
+		}
+		NSString *name = [[parts[0] stringByRemovingPercentEncoding] ?: parts[0] lowercaseString];
+		if (![name isEqualToString:[key lowercaseString]]) {
+			continue;
+		}
+		if (parts.count < 2) {
+			return 0.0;
+		}
+		NSString *value = [parts[1] stringByRemovingPercentEncoding] ?: parts[1];
+		return value.doubleValue;
+	}
+	return 0.0;
+}
+
+/* Le um valor de texto da query string (?a=undo). */
+static NSString *queryString(NSString *query, NSString *key) {
+	for (NSString *pair in [query componentsSeparatedByString:@"&"]) {
+		NSArray *parts = [pair componentsSeparatedByString:@"="];
+		if (parts.count == 0) {
+			continue;
+		}
+		NSString *name = [[parts[0] stringByRemovingPercentEncoding] ?: parts[0] lowercaseString];
+		if (![name isEqualToString:[key lowercaseString]]) {
+			continue;
+		}
+		if (parts.count < 2) {
+			return @"";
+		}
+		return [parts[1] stringByRemovingPercentEncoding] ?: parts[1];
+	}
+	return @"";
+}
+
 @interface WebServer ()
 @property (nonatomic, assign) int listenFD;
 @property (nonatomic, assign) uint16_t port;
@@ -596,8 +636,13 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 		}
 	}
 
-	NSString *path = [rawPath componentsSeparatedByString:@"?"].firstObject;
-	path = [path stringByRemovingPercentEncoding] ?: path;
+	NSString *query = @"";
+	NSArray *rawParts = [rawPath componentsSeparatedByString:@"?"];
+	NSString *rawPathOnly = rawParts.firstObject ?: rawPath;
+	NSString *path = [rawPathOnly stringByRemovingPercentEncoding] ?: rawPathOnly;
+	if (rawParts.count > 1) {
+		query = rawParts[1];
+	}
 	if (![path hasPrefix:@"/"]) {
 		path = [@"/" stringByAppendingString:path];
 	}
@@ -643,6 +688,49 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 			}
 			return;
 		}
+		/* ---- Controle remoto (celular) ---- */
+		if ([path isEqualToString:@"/remote"] || [path isEqualToString:@"/remote/"]) {
+			NSString *html = [RemoteControl controlPageHTML];
+			NSData *data = [html dataUsingEncoding:NSUTF8StringEncoding];
+			PDFSendHead(fd, 200, @"OK", @"text/html; charset=utf-8", data.length, nil);
+			if ([method isEqualToString:@"GET"]) {
+				PDFSendAll(fd, data.bytes, data.length);
+			}
+			return;
+		}
+		if ([path isEqualToString:@"/remote/view.jpg"]) {
+			NSData *jpeg = [[RemoteControl shared] pageJPEGWithWidth:queryValue(query, @"w")];
+			if (jpeg.length == 0) {
+				PDFSendSimple(fd, 503, @"Indisponivel", @"Abra um PDF no iPad.");
+				return;
+			}
+			PDFSendData(fd, 200, @"OK", @"image/jpeg", jpeg);
+			return;
+		}
+		if ([path isEqualToString:@"/remote/state"]) {
+			PDFSendData(fd, 200, @"OK", @"application/json; charset=utf-8",
+						[[RemoteControl shared] stateJSON]);
+			return;
+		}
+		if ([path isEqualToString:@"/remote/touch"]) {
+			double x = queryValue(query, @"x");
+			double y = queryValue(query, @"y");
+			NSInteger phase = (NSInteger)queryValue(query, @"p");
+			[[RemoteControl shared] handleTouchX:x y:y phase:phase];
+			PDFSendData(fd, 200, @"OK", @"text/plain; charset=utf-8",
+						[@"ok" dataUsingEncoding:NSUTF8StringEncoding]);
+			return;
+		}
+		if ([path isEqualToString:@"/remote/action"]) {
+			NSString *action = queryString(query, @"a");
+			NSString *value = queryString(query, @"v");
+			BOOL done = [[RemoteControl shared] handleAction:action value:value];
+			NSString *text = done ? @"ok" : @"Acao nao disponivel.";
+			PDFSendData(fd, done ? 200 : 400, done ? @"OK" : @"Erro",
+						@"text/plain; charset=utf-8",
+						[text dataUsingEncoding:NSUTF8StringEncoding]);
+			return;
+		}
 		if ([path isEqualToString:@"/status"]) {
 			NSMutableArray *names = [NSMutableArray array];
 			for (NSDictionary *file in PDFListFiles()) {
@@ -659,6 +747,25 @@ static NSString *PDFWebDAVMultiStatus(NSString *path) {
 	}
 
 	if ([method isEqualToString:@"POST"]) {
+		if ([path isEqualToString:@"/remote/touch"]) {
+			double x = queryValue(query, @"x");
+			double y = queryValue(query, @"y");
+			NSInteger phase = (NSInteger)queryValue(query, @"p");
+			[[RemoteControl shared] handleTouchX:x y:y phase:phase];
+			PDFSendData(fd, 200, @"OK", @"text/plain; charset=utf-8",
+						[@"ok" dataUsingEncoding:NSUTF8StringEncoding]);
+			return;
+		}
+		if ([path isEqualToString:@"/remote/action"]) {
+			NSString *action = queryString(query, @"a");
+			NSString *value = queryString(query, @"v");
+			BOOL done = [[RemoteControl shared] handleAction:action value:value];
+			NSString *text = done ? @"ok" : @"Acao nao disponivel.";
+			PDFSendData(fd, done ? 200 : 400, done ? @"OK" : @"Erro",
+						@"text/plain; charset=utf-8",
+						[text dataUsingEncoding:NSUTF8StringEncoding]);
+			return;
+		}
 		if ([path isEqualToString:@"/upload"]) {
 			NSMutableArray *saved = [NSMutableArray array];
 			NSInteger count = PDFSaveMultipart(body, headers[@"content-type"], saved);

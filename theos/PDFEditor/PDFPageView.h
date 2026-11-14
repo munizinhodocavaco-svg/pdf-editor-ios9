@@ -36,4 +36,18 @@ typedef NS_ENUM(NSInteger, EditorTool) {
    acontece no maximo 30 vezes por segundo. */
 @property (nonatomic, assign) BOOL throttleEnabled;
 
+/* Controle remoto (celular): injeta um toque como se viesse do dedo.
+   phase: 0 = tocou, 1 = arrastou, 2 = levantou o dedo. */
+- (void)remoteTouchAtPoint:(CGPoint)point phase:(NSInteger)phase;
+
+/* Imagem do que esta aparecendo na tela, no tamanho pedido.
+   Usado pelo controle remoto para mostrar a tela do iPad no celular. */
+- (UIImage *)snapshotWithSize:(CGSize)size;
+
+/* Imagem apenas da area da pagina PDF (sem as faixas cinzas). */
+- (UIImage *)snapshotOfPageWithWidth:(CGFloat)width;
+
+/* Retangulo (em coordenadas da view) onde a pagina PDF e desenhada. */
+- (CGRect)pageDisplayRect;
+
 @end

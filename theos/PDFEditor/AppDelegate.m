@@ -37,11 +37,11 @@
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application {
-	/* Vai para segundo plano: devolve o brilho ao sistema e desliga o
-	   servidor de rede (nada de ficar com o socket aberto sem uso). */
+	/* Sai do app: devolve o brilho ao sistema.
+	   O servidor web NAO e parado aqui: o controle remoto pelo celular
+   precisa continuar funcionando enquanto o app esta em primeiro plano. */
 	[[Power shared] suspendForBackground];
-	[[WebServer sharedServer] stop];
-	PDFLog(@"AppDelegate: app inativo, servidor web desligado");
+	PDFLog(@"AppDelegate: app inativo");
 }
 
 - (void)applicationDidEnterBackground:(UIApplication *)application {

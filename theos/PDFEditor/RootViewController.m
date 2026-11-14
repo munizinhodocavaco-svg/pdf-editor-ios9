@@ -3,6 +3,8 @@
 #import "AnnotationStore.h"
 #import "ColorPickerViewController.h"
 #import "Power.h"
+#import "RemoteControl.h"
+#import "WebServer.h"
 #import "Log.h"
 
 static CGRect PageBoxRectForPage(CGPDFPageRef page) {
@@ -13,7 +15,7 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	return rect;
 }
 
-@interface RootViewController () <PDFPageViewDelegate>
+@interface RootViewController () <PDFPageViewDelegate, RemoteControlDelegate>
 
 @property (nonatomic, strong) NSURL *pdfURL;
 @property (nonatomic, assign) CGPDFDocumentRef document;
@@ -46,6 +48,8 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 @property (nonatomic, strong) UIColor *currentColor;
 @property (nonatomic, assign) EditorTool currentTool;
 @property (nonatomic, assign) CGFloat strokeScale;
+/* Ultima largura da imagem enviada ao celular (para mapear coordenadas). */
+@property (nonatomic, assign) CGFloat lastRemoteWidth;
 
 @end
 
@@ -99,6 +103,13 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 												 name:PowerModeDidChangeNotification
 											   object:nil];
 	[self applyPowerMode];
+
+	/* Controle remoto pelo celular: este controlador responde as acoes. */
+	[RemoteControl shared].delegate = self;
+
+	/* O servidor precisa estar no ar para o celular conectar (controle remoto
+	   e envio de arquivos). Ele fica ligado enquanto o editor estiver aberto. */
+	[[WebServer sharedServer] startOnPort:8080];
 
 	if (self.pageCount == 0) {
 		UILabel *error = [[UILabel alloc] initWithFrame:CGRectZero];
@@ -440,6 +451,123 @@ static CGRect PageBoxRectForPage(CGPDFPageRef page) {
 	action();
 	[self refreshAnnotations];
 	PDFLog(@"Editor: desfazer (%lu restantes)", (unsigned long)self.undoStack.count);
+}
+
+#pragma mark - Controle remoto (celular)
+
+- (UIImage *)remotePageImageWithWidth:(CGFloat)width {
+	if (self.pageView == nil || self.pageCount == 0) {
+		return nil;
+	}
+	self.lastRemoteWidth = width;
+	return [self.pageView snapshotOfPageWithWidth:width];
+}
+
+- (NSDictionary *)remoteState {
+	NSArray *colors = [self availableColors];
+	NSInteger colorIndex = 0;
+	for (NSUInteger i = 0; i < colors.count; i++) {
+		if ([colors objectAtIndex:i] == self.currentColor) {
+			colorIndex = (NSInteger)i;
+			break;
+		}
+	}
+	return @{
+		@"page": @(self.currentPage),
+		@"pages": @(self.pageCount),
+		@"tool": @(self.currentTool),
+		@"size": @(self.strokeScale),
+		@"color": @(colorIndex),
+		@"title": self.pdfURL.lastPathComponent ?: @"",
+		@"canUndo": @(self.undoStack.count > 0),
+		@"replace": @(_replaceOriginal)
+	};
+}
+
+- (BOOL)remotePerformAction:(NSString *)action value:(NSString *)value {
+	if (action.length == 0) {
+		return NO;
+	}
+
+	if ([action isEqualToString:@"undo"]) {
+		[self undoTapped:nil];
+		return YES;
+	}
+	if ([action isEqualToString:@"save"]) {
+		[self saveTapped:nil];
+		return YES;
+	}
+	if ([action isEqualToString:@"replace"]) {
+		[self replaceToggled:nil];
+		return YES;
+	}
+	if ([action isEqualToString:@"next"]) {
+		[self nextTapped:nil];
+		return YES;
+	}
+	if ([action isEqualToString:@"prev"]) {
+		[self prevTapped:nil];
+		return YES;
+	}
+	if ([action isEqualToString:@"refresh"]) {
+		return YES;
+	}
+	if ([action isEqualToString:@"tool"]) {
+		NSInteger index = value.integerValue;
+		if (index < 0 || index > 2) {
+			return NO;
+		}
+		self.toolControl.selectedSegmentIndex = index;
+		[self toolChanged:self.toolControl];
+		return YES;
+	}
+	if ([action isEqualToString:@"size"]) {
+		NSInteger size = value.integerValue;
+		if (size < 1 || size > 3) {
+			return NO;
+		}
+		self.sizeControl.selectedSegmentIndex = size - 1;
+		[self sizeChanged:self.sizeControl];
+		return YES;
+	}
+	if ([action isEqualToString:@"color"]) {
+		NSArray *colors = [self availableColors];
+		NSInteger index = value.integerValue;
+		if (index < 0 || index >= (NSInteger)colors.count) {
+			return NO;
+		}
+		[self applyColor:[colors objectAtIndex:index]];
+		return YES;
+	}
+	if ([action isEqualToString:@"hsv"]) {
+		// Sem seletor de matiz no celular: alterna entre as cores fixas.
+		NSArray *colors = [self availableColors];
+		NSInteger next = 0;
+		for (NSUInteger i = 0; i < colors.count; i++) {
+			if ([colors objectAtIndex:i] == self.currentColor) {
+				next = (NSInteger)((i + 1) % colors.count);
+				break;
+			}
+		}
+		[self applyColor:[colors objectAtIndex:next]];
+		return YES;
+	}
+	return NO;
+}
+
+- (void)remoteTouchAtPoint:(CGPoint)point phase:(NSInteger)phase {
+	if (self.pageView == nil || self.pageCount == 0) {
+		return;
+	}
+	CGRect display = [self.pageView pageDisplayRect];
+	if (display.size.width < 1.0 || display.size.height < 1.0) {
+		return;
+	}
+	CGFloat width = self.lastRemoteWidth > 1.0 ? self.lastRemoteWidth : display.size.width;
+	CGFloat scale = display.size.width / width;
+	CGPoint mapped = CGPointMake(display.origin.x + point.x * scale,
+								  display.origin.y + point.y * scale);
+	[self.pageView remoteTouchAtPoint:mapped phase:phase];
 }
 
 - (void)prevTapped:(id)sender {

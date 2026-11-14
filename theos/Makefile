@@ -15,6 +15,7 @@ PDFEditor_FILES = PDFEditor/main.m \
 	PDFEditor/Annotation.m \
 	PDFEditor/AnnotationStore.m \
 	PDFEditor/WebServer.m \
+	PDFEditor/RemoteControl.m \
 	PDFEditor/ColorPickerViewController.m \
 	PDFEditor/Power.m \
 	PDFEditor/Log.m

@@ -24,6 +24,13 @@
 - (void)invalidatePageImage;
 - (void)invalidateCompositeImage;
 
+/* Toques separados do UIKit para poderem ser injetados pelo controle remoto. */
+- (void)beginTouchAtPoint:(CGPoint)point;
+- (void)moveTouchToPoint:(CGPoint)point;
+- (void)endTouch;
+
+- (void)drawAnnotatedPageInContext:(CGContextRef)context;
+
 @end
 
 @implementation PDFPageView
@@ -264,7 +271,11 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	UITouch *touch = [touches anyObject];
-	CGPoint point = [touch locationInView:self];
+	[self beginTouchAtPoint:[touch locationInView:self]];
+}
+
+/* Inicio do traco (usado tanto pelo toque real quanto pelo controle remoto). */
+- (void)beginTouchAtPoint:(CGPoint)point {
 	CGRect display = [self pageDisplayRect];
 
 	if (!CGRectContainsPoint(display, point)) {
@@ -310,9 +321,6 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		return;
 	}
 
-	CGRect display = [self pageDisplayRect];
-	CGFloat padding = [self dirtyPadding];
-
 	/* coalescedTouchesForTouch entrega todos os pontos que o sistema capturou
 	   entre dois quadros: traco mais suave sem custo extra de renderizacao. */
 	NSArray *samples = [event coalescedTouchesForTouch:touch];
@@ -320,28 +328,38 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		samples = @[touch];
 	}
 
-	CGRect dirty = CGRectNull;
 	for (UITouch *sample in samples) {
-		CGPoint point = [sample locationInView:self];
-		CGFloat dx = point.x - self.lastPoint.x;
-		CGFloat dy = point.y - self.lastPoint.y;
-		if (sqrt(dx * dx + dy * dy) < 1.5) {
-			continue;
-		}
-
-		CGRect segment = CGRectMake(MIN(self.lastPoint.x, point.x) - padding,
-									MIN(self.lastPoint.y, point.y) - padding,
-									fabs(dx) + padding * 2.0,
-									fabs(dy) + padding * 2.0);
-		dirty = CGRectIsNull(dirty) ? segment : CGRectUnion(dirty, segment);
-
-		self.lastPoint = point;
-		[self.currentAnnotation addPoint:[self normalizedPoint:point inRect:display]];
+		[self moveTouchToPoint:[sample locationInView:self]];
 	}
+}
 
-	if (CGRectIsNull(dirty)) {
+/* Arrasto do traco (um ponto). */
+- (void)moveTouchToPoint:(CGPoint)point {
+	if (self.tool == EditorToolEraser) {
+		[self eraseAtPoint:point];
 		return;
 	}
+
+	if (self.currentAnnotation == nil) {
+		return;
+	}
+
+	CGRect display = [self pageDisplayRect];
+	CGFloat padding = [self dirtyPadding];
+
+	CGFloat dx = point.x - self.lastPoint.x;
+	CGFloat dy = point.y - self.lastPoint.y;
+	if (sqrt(dx * dx + dy * dy) < 1.5) {
+		return;
+	}
+
+	CGRect segment = CGRectMake(MIN(self.lastPoint.x, point.x) - padding,
+								MIN(self.lastPoint.y, point.y) - padding,
+								fabs(dx) + padding * 2.0,
+								fabs(dy) + padding * 2.0);
+
+	self.lastPoint = point;
+	[self.currentAnnotation addPoint:[self normalizedPoint:point inRect:display]];
 
 	/* MODO ECO: limita o redesenho a 30 FPS. Todos os pontos continuam sendo
 	   gravados no traco, apenas o desenho e adiado (o proximo quadro mostra
@@ -351,13 +369,14 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 		if (now - self.lastDrawTimestamp < (1.0 / 30.0)) {
 			// Ainda dentro do intervalo: guarda a area suja para o proximo quadro.
 			self.pendingDirtyRect = CGRectIsNull(self.pendingDirtyRect)
-				? dirty
-				: CGRectUnion(self.pendingDirtyRect, dirty);
+				? segment
+				: CGRectUnion(self.pendingDirtyRect, segment);
 			return;
 		}
 		self.lastDrawTimestamp = now;
 	}
 
+	CGRect dirty = segment;
 	if (!CGRectIsNull(self.pendingDirtyRect)) {
 		dirty = CGRectUnion(dirty, self.pendingDirtyRect);
 		self.pendingDirtyRect = CGRectNull;
@@ -367,6 +386,11 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+	[self endTouch];
+}
+
+/* Fim do traco. */
+- (void)endTouch {
 	if (self.currentAnnotation == nil) {
 		return;
 	}
@@ -390,6 +414,76 @@ static CGRect PageBoxRect(CGPDFPageRef page) {
 	self.currentAnnotation = nil;
 	self.pendingDirtyRect = CGRectNull;
 	[self setNeedsDisplay];
+}
+
+#pragma mark - Controle remoto
+
+- (void)remoteTouchAtPoint:(CGPoint)point phase:(NSInteger)phase {
+	if (phase == 0) {
+		[self beginTouchAtPoint:point];
+	} else if (phase == 1) {
+		[self moveTouchToPoint:point];
+	} else {
+		[self endTouch];
+	}
+}
+
+- (UIImage *)snapshotWithSize:(CGSize)size {
+	CGSize full = self.bounds.size;
+	if (full.width < 1.0 || full.height < 1.0) {
+		return nil;
+	}
+
+	UIGraphicsBeginImageContextWithOptions(full, YES, 1.0);
+	CGContextRef context = UIGraphicsGetCurrentContext();
+	[self drawAnnotatedPageInContext:context];
+	if (self.currentAnnotation != nil) {
+		DrawAnnotationInContext(context, self.currentAnnotation, [self pageDisplayRect]);
+	}
+	UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+
+	if (image == nil || size.width < 1.0 || size.height < 1.0) {
+		return image;
+	}
+	if (CGSizeEqualToSize(size, full)) {
+		return image;
+	}
+
+	UIGraphicsBeginImageContextWithOptions(size, YES, 1.0);
+	[image drawInRect:CGRectMake(0.0, 0.0, size.width, size.height)];
+	UIImage *small = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+	return small;
+}
+
+/* Imagem apenas da AREA DA PAGINA (sem as faixas cinzas).
+   O celular desenha por cima dela, entao as coordenadas batem com a pagina. */
+- (UIImage *)snapshotOfPageWithWidth:(CGFloat)width {
+	CGRect display = [self pageDisplayRect];
+	if (display.size.width < 1.0 || display.size.height < 1.0 || width < 8.0) {
+		return nil;
+	}
+
+	UIGraphicsBeginImageContextWithOptions(display.size, YES, 1.0);
+	CGContextRef context = UIGraphicsGetCurrentContext();
+	CGContextTranslateCTM(context, -display.origin.x, -display.origin.y);
+	[self drawAnnotatedPageInContext:context];
+	if (self.currentAnnotation != nil) {
+		DrawAnnotationInContext(context, self.currentAnnotation, display);
+	}
+	UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+	if (image == nil) {
+		return nil;
+	}
+
+	CGFloat height = width * display.size.height / display.size.width;
+	UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), YES, 1.0);
+	[image drawInRect:CGRectMake(0.0, 0.0, width, height)];
+	UIImage *small = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+	return small;
 }
 
 #pragma mark - Borracha
