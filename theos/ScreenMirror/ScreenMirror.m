@@ -9,6 +9,9 @@
 
 #define MJPEG_BOUNDARY "screenmirror_boundary"
 
+// Private API
+extern CGImageRef UIGetScreenImage(void);
+
 @interface ScreenMirror ()
 @property (nonatomic, assign) uint16_t port;
 @property (nonatomic, assign) int listenFD;
@@ -85,7 +88,6 @@
 			break;
 		}
 		
-		// Handle each client on a separate queue
 		dispatch_queue_t clientQueue = dispatch_queue_create("com.screenmirror.client", DISPATCH_QUEUE_SERIAL);
 		dispatch_async(clientQueue, ^{
 			[self handleClient:client];
@@ -100,18 +102,25 @@
 	if (n <= 0) return;
 	buffer[n] = '\0';
 	
-	// Parse request - just check if it's GET /
 	if (strncmp(buffer, "GET ", 4) != 0) {
 		[self sendError:client code:400 message:@"Bad Request"];
 		return;
 	}
 	
-	// Send MJPEG stream
 	[self sendMJPEGStream:client];
 }
 
+- (void)sendError:(int)client code:(int)code message:(NSString *)msg {
+	char header[512];
+	snprintf(header, sizeof(header),
+		"HTTP/1.1 %d %s\r\n"
+		"Content-Type: text/plain\r\n"
+		"Connection: close\r\n"
+		"\r\n%s", code, msg.UTF8String, msg.UTF8String);
+	write(client, header, strlen(header));
+}
+
 - (void)sendMJPEGStream:(int)client {
-	// HTTP headers for MJPEG
 	char header[1024];
 	snprintf(header, sizeof(header),
 		"HTTP/1.1 200 OK\r\n"
@@ -122,31 +131,18 @@
 	
 	write(client, header, strlen(header));
 	
-	// Capture and send frames
-	UIApplication *app = [UIApplication sharedApplication];
-	if (app == nil) {
-		// No UIApplication - create one for UIGetScreenImage
-		int argc = 1;
-		char *argv[] = { "ScreenMirror", NULL };
-		UIApplicationMain(argc, argv, nil, nil);
-		app = [UIApplication sharedApplication];
-	}
-	
 	while (_running) {
-		// Capture screen using private API
 		CGImageRef screenImage = UIGetScreenImage();
 		if (!screenImage) {
-			usleep(50000); // 20 FPS
+			usleep(50000);
 			continue;
 		}
 		
-		// Convert to JPEG
 		NSData *jpegData = [self jpegFromCGImage:screenImage quality:0.6];
 		CGImageRelease(screenImage);
 		
 		if (!jpegData) continue;
 		
-		// Write MJPEG frame
 		char frameHeader[512];
 		snprintf(frameHeader, sizeof(frameHeader),
 			"\r\n--%s\r\n"
@@ -160,7 +156,6 @@
 		written = write(client, jpegData.bytes, jpegData.length);
 		if (written != (ssize_t)jpegData.length) break;
 		
-		// ~20 FPS
 		usleep(50000);
 	}
 }
@@ -169,7 +164,6 @@
 	size_t width = CGImageGetWidth(image);
 	size_t height = CGImageGetHeight(image);
 	
-	// Create bitmap context
 	CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
 	CGContextRef context = CGBitmapContextCreate(NULL, width, height, 8, width * 4, colorSpace, kCGImageAlphaPremultipliedLast);
 	CGColorSpaceRelease(colorSpace);
@@ -178,13 +172,11 @@
 	
 	CGContextDrawImage(context, CGRectMake(0, 0, width, height), image);
 	
-	// Create new image from context
 	CGImageRef newImage = CGBitmapContextCreateImage(context);
 	CGContextRelease(context);
 	
 	if (!newImage) return nil;
 	
-	// Convert to JPEG using UIImage
 	UIImage *uiImage = [UIImage imageWithCGImage:newImage];
 	CGImageRelease(newImage);
 	
@@ -192,6 +184,3 @@
 }
 
 @end
-
-// Private API declaration
-extern CGImageRef UIGetScreenImage(void);

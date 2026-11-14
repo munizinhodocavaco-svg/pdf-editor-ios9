@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <sys/stat.h>
 #import "ScreenMirror.h"
 
 int main(int argc, char *argv[]) {
@@ -18,7 +19,8 @@ int main(int argc, char *argv[]) {
 		// Child continues
 		setsid();
 		chdir("/");
-		umask(0);
+		mode_t old_mask = umask(0);
+		(void)old_mask;
 		
 		// Close std fds
 		close(STDIN_FILENO);
