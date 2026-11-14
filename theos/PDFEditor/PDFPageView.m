@@ -385,22 +385,94 @@ static CGFloat DistanceToSegment(CGPoint point, CGPoint start, CGPoint end) {
 	CGRect display = [self pageDisplayRect];
 	/* A borracha acompanha o tamanho escolhido (1x, 2x, 3x). */
 	CGFloat tolerance = MAX(6.0, self.eraserWidth * 0.5 + 6.0);
-	if (annotation.type == AnnotationTypeHighlighter) {
-		tolerance += 4.0;
-	}
 
-	CGPoint previous = CGPointZero;
-	for (NSUInteger i = 0; i < annotation.points.count; i++) {
-		CGPoint normalized = [[annotation.points objectAtIndex:i] CGPointValue];
-		// INVERTE Y para coincidir com o desenho das anotacoes
-		CGPoint current = CGPointMake(display.origin.x + normalized.x * display.size.width,
-									  display.origin.y + (1.0 - normalized.y) * display.size.height);
-		if (i > 0 && DistanceToSegment(point, previous, current) <= tolerance) {
-			return YES;
+	if (annotation.type == AnnotationTypeHighlighter) {
+		/* MARCADOR: hit-test no retângulo real desenhado (estende para baixo do traço).
+		   O marcador desenha retângulos CENTRADOS horizontalmente no segmento,
+		   com largura 2.5x o traço e altura 1.6x o traço, estendendo para BAIXO (+Y).
+		   Verificamos se o ponto está dentro de qualquer um desses retângulos. */
+		CGFloat strokeWidth = MAX(4.0 * display.size.width * [annotation width], 1.0);
+		CGFloat markerWidth = strokeWidth * 2.5;
+		CGFloat highlighterHeight = strokeWidth * 1.6;
+		CGFloat halfMarkerW = markerWidth / 2.0;
+
+		for (NSUInteger i = 1; i < annotation.points.count; i++) {
+			CGPoint p0 = [[annotation.points objectAtIndex:i - 1] CGPointValue];
+			CGPoint p1 = [[annotation.points objectAtIndex:i] CGPointValue];
+			// INVERTE Y: normalizado -> coordenadas da view (mesmo que DrawAnnotationInContext)
+			CGFloat x0 = display.origin.x + p0.x * display.size.width;
+			CGFloat y0 = display.origin.y + (1.0 - p0.y) * display.size.height;
+			CGFloat x1 = display.origin.x + p1.x * display.size.width;
+			CGFloat y1 = display.origin.y + (1.0 - p1.y) * display.size.height;
+
+			CGFloat dx = x1 - x0;
+			CGFloat dy = y1 - y0;
+			CGFloat len = sqrt(dx * dx + dy * dy);
+			if (len < 0.5) continue;
+
+			CGFloat ux = dx / len;
+			CGFloat uy = dy / len;
+			// Perpendicular horizontal (largura do marcador)
+			CGFloat px = -uy * halfMarkerW;
+			CGFloat py = ux * halfMarkerW;
+			// Vetor para baixo (altura do marcador)
+			CGFloat down_x = -uy * highlighterHeight;
+			CGFloat down_y = ux * highlighterHeight;
+
+			// Verifica se o ponto está dentro do quadrilátero do marcador
+			// 4 vértices: topo-esq, topo-dir, base-dir, base-esq
+			CGPoint verts[4] = {
+				{x0 + px, y0 + py},                          // topo-esq
+				{x1 + px, y1 + py},                          // topo-dir
+				{x1 + px + down_x, y1 + py + down_y},        // base-dir
+				{x0 + px + down_x, y0 + py + down_y}         // base-esq
+			};
+			if ([self pointInConvexQuad:point vertices:verts]) {
+				return YES;
+			}
 		}
-		previous = current;
+
+		// Único ponto: retângulo centrado horizontalmente, abaixo do ponto
+		if (annotation.points.count == 1) {
+			CGPoint p0 = [[annotation.points objectAtIndex:0] CGPointValue];
+			CGFloat x0 = display.origin.x + p0.x * display.size.width;
+			CGFloat y0 = display.origin.y + (1.0 - p0.y) * display.size.height;
+			CGRect r = CGRectMake(x0 - halfMarkerW, y0, markerWidth, highlighterHeight);
+			if (CGRectContainsPoint(r, point)) {
+				return YES;
+			}
+		}
+		return NO;
+	} else {
+		/* LÁPIS: hit-test na linha central com tolerância. */
+		CGPoint previous = CGPointZero;
+		for (NSUInteger i = 0; i < annotation.points.count; i++) {
+			CGPoint normalized = [[annotation.points objectAtIndex:i] CGPointValue];
+			// INVERTE Y para coincidir com o desenho das anotacoes
+			CGPoint current = CGPointMake(display.origin.x + normalized.x * display.size.width,
+										  display.origin.y + (1.0 - normalized.y) * display.size.height);
+			if (i > 0 && DistanceToSegment(point, previous, current) <= tolerance) {
+				return YES;
+			}
+			previous = current;
+		}
+		return NO;
 	}
-	return NO;
+}
+
+/* Testa se ponto está dentro de quadrilátero convexo (4 vértices em ordem). */
+- (BOOL)pointInConvexQuad:(CGPoint)p vertices:(CGPoint[4])v {
+	// Produto vetorial para verificar se está do mesmo lado de todas as arestas
+	BOOL pos = NO, neg = NO;
+	for (int i = 0; i < 4; i++) {
+		CGPoint a = v[i];
+		CGPoint b = v[(i + 1) % 4];
+		CGFloat cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+		if (cross > 0) pos = YES;
+		if (cross < 0) neg = YES;
+		if (pos && neg) return NO;
+	}
+	return YES;
 }
 
 - (void)eraseAtPoint:(CGPoint)point {

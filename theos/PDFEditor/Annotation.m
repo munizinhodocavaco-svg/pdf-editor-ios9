@@ -112,18 +112,21 @@ void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRec
 	CGContextSetLineJoin(context, kCGLineJoinRound);
 
 	if (annotation.type == AnnotationTypeHighlighter) {
-		/* MARCADOR VERSÃO ANTERIOR:
-		   - Desenha retângulos preenchidos ABAIXO de cada segmento de toque
-		   - O retângulo começa no ponto de toque e estende para BAIXO (+Y na view)
-		   - Cobrindo a linha de texto onde o dedo passou
-		   - Blend Multiply escurece o texto por baixo */
+		/* MARCADOR MELHORADO:
+		   - Retângulo preenchido ABAIXO do traço (blend Multiply escurece o texto)
+		   - Largura do retângulo = 2.5x a largura do traço (cobre mais da linha)
+		   - Altura fixa para cobrir exatamente uma linha de texto típica
+		   - Início no ponto de toque, estende para BAIXO (+Y na view) */
 		CGContextSetBlendMode(context, kCGBlendModeMultiply);
-		CGContextSetAlpha(context, 0.4);
+		CGContextSetAlpha(context, 0.45);  // Um pouco mais visível
 		CGContextSetFillColorWithColor(context, color.CGColor);
 
 		CGFloat strokeWidth = MAX(annotation.width * rect.size.width, 1.0);
-		// Altura do marcador: cobre uma linha de texto típica
-		CGFloat highlighterHeight = strokeWidth * 1.5;
+		// Largura do marcador: 2.5x o traço = cobre bem a largura do texto
+		CGFloat markerWidth = strokeWidth * 2.5;
+		// Altura do marcador: altura de uma linha de texto típica (~1.6x largura do traço)
+		CGFloat highlighterHeight = strokeWidth * 1.6;
+		CGFloat halfMarkerW = markerWidth / 2.0;
 
 		for (NSUInteger i = 1; i < annotation.points.count; i++) {
 			CGPoint p0 = [[annotation.points objectAtIndex:i - 1] CGPointValue];
@@ -134,7 +137,6 @@ void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRec
 			CGFloat x1 = rect.origin.x + p1.x * rect.size.width;
 			CGFloat y1 = rect.origin.y + (1.0 - p1.y) * rect.size.height;
 
-			// Retângulo que começa no segmento e estende para BAIXO (cobrindo o texto)
 			CGFloat dx = x1 - x0;
 			CGFloat dy = y1 - y0;
 			CGFloat len = sqrt(dx * dx + dy * dy);
@@ -142,30 +144,34 @@ void DrawAnnotationInContext(CGContextRef context, Annotation *annotation, CGRec
 
 			CGFloat ux = dx / len;
 			CGFloat uy = dy / len;
-			// Perpendicular apontando para baixo na view (+Y)
-			CGFloat px = -uy * highlighterHeight;
-			CGFloat py = ux * highlighterHeight;
+			// Perpendicular (largura do marcador)
+			CGFloat px = -uy * halfMarkerW;
+			CGFloat py = ux * halfMarkerW;
+			// Vetor para baixo (altura do marcador)
+			CGFloat dx_down = ux * highlighterHeight;
+			CGFloat dy_down = uy * highlighterHeight;
+			// Correção: para baixo na view é +Y, então usamos perpendicular rotacionado
+			// Perpendicular apontando para baixo (+Y na view)
+			CGFloat down_x = -uy * highlighterHeight;
+			CGFloat down_y = ux * highlighterHeight;
 
 			CGContextBeginPath(context);
-			// Canto superior esquerdo do retângulo (no segmento)
-			CGContextMoveToPoint(context, x0, y0);
-			// Canto superior direito
-			CGContextAddLineToPoint(context, x1, y1);
-			// Canto inferior direito (estendido para baixo)
-			CGContextAddLineToPoint(context, x1 + px, y1 + py);
-			// Canto inferior esquerdo
-			CGContextAddLineToPoint(context, x0 + px, y0 + py);
+			// Retângulo centrado horizontalmente no segmento, estendendo para baixo
+			// 4 vértices: topo-esq, topo-dir, base-dir, base-esq
+			CGContextMoveToPoint(context, x0 + px, y0 + py);           // topo-esq
+			CGContextAddLineToPoint(context, x1 + px, y1 + py);         // topo-dir
+			CGContextAddLineToPoint(context, x1 + px + down_x, y1 + py + down_y); // base-dir
+			CGContextAddLineToPoint(context, x0 + px + down_x, y0 + py + down_y); // base-esq
 			CGContextClosePath(context);
 			CGContextFillPath(context);
 		}
 
-		// Único ponto: retângulo abaixo do ponto
+		// Único ponto: retângulo centrado horizontalmente, abaixo do ponto
 		if (annotation.points.count == 1) {
 			CGPoint p0 = [[annotation.points objectAtIndex:0] CGPointValue];
 			CGFloat x0 = rect.origin.x + p0.x * rect.size.width;
 			CGFloat y0 = rect.origin.y + (1.0 - p0.y) * rect.size.height;
-			CGFloat halfW = strokeWidth / 2.0;
-			CGRect r = CGRectMake(x0 - halfW, y0, strokeWidth, highlighterHeight);
+			CGRect r = CGRectMake(x0 - halfMarkerW, y0, markerWidth, highlighterHeight);
 			CGContextFillRect(context, r);
 		}
 
